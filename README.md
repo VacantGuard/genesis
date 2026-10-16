@@ -58,9 +58,24 @@ The first launch inserts sample content you can edit or delete:
 - A weekly portioned menu (breakfasts, mains, sides) with one sold-out meal
 - Company **Sample Studio Co.** and three sample customers (555 numbers and `.example` emails)
 
+## Trigger.dev
+
+Background automations live under `src/trigger/` and run on Trigger.dev v4.5.15.
+
+Agent workflow rules: `CLAUDE.md`. SDK patterns: `trigger-ref.md`. Cursor MCP: `.cursor/mcp.json`.
+
+1. Create a project at [cloud.trigger.dev](https://cloud.trigger.dev) and copy the project ref plus a secret key.
+2. Copy `.env.example` to `.env` and set `TRIGGER_PROJECT_REF` and `TRIGGER_SECRET_KEY`.
+3. In another terminal: `npm run trigger:dev`
+4. Smoke-test the registered task `health-ping` (empty payload is fine).
+
+Do not deploy with `npm run trigger:deploy` until a local run has succeeded and you explicitly approve a deploy. Add the same env vars in the Trigger.dev dashboard (staging and prod) before any production deploy.
+
 ## Scripts
 
 - `npm run dev` — development server on port 43123
 - `npm run lint` — ESLint
 - `npm run build` — production build
 - `npm start` — production server on port 43123
+- `npm run trigger:dev` — Trigger.dev local worker (needs `.env`)
+- `npm run trigger:deploy` — deploy tasks (needs approval + dashboard env vars)
