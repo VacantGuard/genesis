@@ -12,7 +12,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { deleteCustomerAction, saveCustomerAction } from "@/lib/actions";
-import { getCustomer, listCompanies, listCustomers } from "@/lib/db";
+import { currentBusiness } from "@/lib/current-business";
+import { getCustomer, listCompanies, listCustomers } from "@/lib/directory";
 
 export default async function CustomersPage({
   searchParams,
@@ -20,10 +21,11 @@ export default async function CustomersPage({
   searchParams: Promise<{ edit?: string; error?: string; saved?: string }>;
 }) {
   const query = await searchParams;
+  const business = await currentBusiness();
   const editId = Number(query.edit);
-  const editing = Number.isInteger(editId) && editId > 0 ? getCustomer(editId) : null;
-  const customers = listCustomers();
-  const companies = listCompanies();
+  const editing = Number.isInteger(editId) && editId > 0 ? getCustomer(business.id, editId) : null;
+  const customers = listCustomers(business.id);
+  const companies = listCompanies(business.id);
 
   return (
     <>

@@ -1,10 +1,12 @@
-import { getDashboardStats, listOrders } from "@/lib/db";
+import { currentBusiness } from "@/lib/current-business";
 import { formatMoney, formatWhen } from "@/lib/format";
+import { getDashboardStats, listOrders } from "@/lib/orders";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function TerminalHomePage() {
-  const stats = getDashboardStats();
-  const recent = listOrders().slice(0, 5);
+export default async function TerminalHomePage() {
+  const business = await currentBusiness();
+  const stats = getDashboardStats(business.id);
+  const recent = listOrders(business.id).slice(0, 5);
 
   const tiles = [
     { label: "Paid orders", value: String(stats.orderCount) },

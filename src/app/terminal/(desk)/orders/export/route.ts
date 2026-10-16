@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { currentBusiness } from "@/lib/current-business";
 import { toCsv } from "@/lib/csv";
-import { orderExportRows } from "@/lib/db";
 import { formatMoney } from "@/lib/format";
+import { orderExportRows } from "@/lib/orders";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/terminal/login", request.url));
   }
 
-  const rows = orderExportRows();
+  const business = await currentBusiness();
+  const rows = orderExportRows(business.id);
   const csv = toCsv(
     [
       "order_number",

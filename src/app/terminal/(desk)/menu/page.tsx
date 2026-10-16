@@ -13,8 +13,9 @@ import {
   setAvailabilityAction,
   updateMenuItemAction,
 } from "@/lib/actions";
-import { listCategories, listMenuItems } from "@/lib/db";
+import { currentBusiness } from "@/lib/current-business";
 import { formatMoney } from "@/lib/format";
+import { listCategories, listMenuItems } from "@/lib/menu";
 
 export default async function MenuPage({
   searchParams,
@@ -22,8 +23,9 @@ export default async function MenuPage({
   searchParams: Promise<{ error?: string; saved?: string }>;
 }) {
   const query = await searchParams;
-  const categories = listCategories();
-  const items = listMenuItems();
+  const business = await currentBusiness();
+  const categories = listCategories(business.id);
+  const items = listMenuItems(business.id);
 
   return (
     <>

@@ -1,0 +1,150 @@
+import { getDb, OrderError, type NewOrderInput } from "./db.ts";
+import type { DashboardStats, KitchenOrder } from "./types.ts";
+
+export type { NewOrderInput };
+
+function nextOrderNumber(db: ReturnType<typeof getDb>) {
+  const row = db
+    .prepare("SELECT order_number AS orderNumber FROM orders ORDER BY id DESC LIMIT 1")
+    .get() as { orderNumber: string } | undefined;
+  const current = row ? Number(row.orderNumber.replace(/\D/g, "")) : 1000;
+  const next = Number.isFinite(current) && current >= 1000 ? current + 1 : 1001;
+  return `WK-${next}`;
+}
+
+export function placeOrder(businessId: number, input: NewOrderInput) {
+  const db = getDb();
+  const run = db.transaction(() => {
+    if (input.lines.length === 0) throw new OrderError("Add at least one meal.");
+
+    const priced: { name: string; quantity: number; unitPriceCents: number }[] = [];
+    for (const line of input.lines) {
+      if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 25) {
+        throw new OrderError("Quantity must be between 1 and 25.");
+      }
+      const item = db
+        .prepare(
+          `SELECT i.name, i.price_cents AS priceCents, i.available
+           FROM menu_items i
+           JOIN menu_categories c ON c.id = i.category_id
+           WHERE i.id = ? AND c.business_id = ?`,
+        )
+        .get(line.menuItemId, businessId) as
+        | { name: string; priceCents: number; available: number }
+        | undefined;
+      if (!item || item.available !== 1) {
+        throw new OrderError("Something in the cart is no longer available. Refresh the menu.");
+      }
+      priced.push({ name: item.name, quantity: line.quantity, unitPriceCents: item.priceCents });
+    }
+
+    const totalCents = priced.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0);
+    const orderNumber = nextOrderNumber(db);
+    const createdAt = new Date().toISOString();
+    const inserted = db
+      .prepare(
+        `INSERT INTO orders
+          (order_number, customer_name, phone, email, company_name, notes, card_last4, total_cents, status, created_at, business_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?)`,
+      )
+      .run(
+        orderNumber,
+        input.customerName,
+        input.phone,
+        input.email,
+        input.companyName,
+        input.notes,
+        input.cardLast4,
+        totalCents,
+        createdAt,
+        businessId,
+      );
+    const orderId = Number(inserted.lastInsertRowid);
+    const insertItem = db.prepare(
+      `INSERT INTO order_items (order_id, item_name, quantity, unit_price_cents) VALUES (?, ?, ?, ?)`,
+    );
+    for (const line of priced) insertItem.run(orderId, line.name, line.quantity, line.unitPriceCents);
+    return { orderNumber, totalCents, customerName: input.customerName, items: priced };
+  });
+  return run();
+}
+
+export function listOrders(businessId: number): KitchenOrder[] {
+  const db = getDb();
+  const orders = db
+    .prepare(
+      `SELECT id, order_number AS orderNumber, customer_name AS customerName, phone, email,
+              company_name AS companyName, notes, card_last4 AS cardLast4,
+              total_cents AS totalCents, created_at AS createdAt
+       FROM orders WHERE business_id = ? ORDER BY id DESC`,
+    )
+    .all(businessId) as Omit<KitchenOrder, "items">[];
+  const itemStmt = db.prepare(
+    `SELECT item_name AS name, quantity, unit_price_cents AS unitPriceCents
+     FROM order_items WHERE order_id = ? ORDER BY id`,
+  );
+  return orders.map((order) => ({
+    ...order,
+    items: itemStmt.all(order.id) as KitchenOrder["items"],
+  }));
+}
+
+export function orderExportRows(businessId: number) {
+  return getDb()
+    .prepare(
+      `SELECT o.order_number AS orderNumber, o.customer_name AS customerName,
+              o.company_name AS companyName, o.phone, o.email, oi.item_name AS item,
+              oi.quantity, oi.unit_price_cents AS unitPriceCents, o.notes, o.created_at AS placedAt
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.id
+       WHERE o.business_id = ?
+       ORDER BY o.id DESC, oi.id ASC`,
+    )
+    .all(businessId) as {
+    orderNumber: string;
+    customerName: string;
+    companyName: string;
+    phone: string;
+    email: string;
+    item: string;
+    quantity: number;
+    unitPriceCents: number;
+    notes: string;
+    placedAt: string;
+  }[];
+}
+
+export function getDashboardStats(businessId: number): DashboardStats {
+  const db = getDb();
+  const orders = db
+    .prepare("SELECT COUNT(*) AS n, COALESCE(SUM(total_cents), 0) AS total FROM orders WHERE business_id = ?")
+    .get(businessId) as { n: number; total: number };
+  const today = db
+    .prepare("SELECT COUNT(*) AS n FROM orders WHERE business_id = ? AND date(created_at) = date('now')")
+    .get(businessId) as { n: number };
+  const customers = db
+    .prepare("SELECT COUNT(*) AS n FROM customers WHERE business_id = ?")
+    .get(businessId) as { n: number };
+  const companies = db
+    .prepare("SELECT COUNT(*) AS n FROM companies WHERE business_id = ?")
+    .get(businessId) as { n: number };
+  const available = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM menu_items i
+       JOIN menu_categories c ON c.id = i.category_id
+       WHERE c.business_id = ? AND i.available = 1`,
+    )
+    .get(businessId) as { n: number };
+  const campaigns = db
+    .prepare("SELECT COUNT(*) AS n FROM campaigns WHERE business_id = ?")
+    .get(businessId) as { n: number };
+  return {
+    orderCount: orders.n,
+    todayOrderCount: today.n,
+    salesCents: orders.total,
+    customerCount: customers.n,
+    companyCount: companies.n,
+    availableItemCount: available.n,
+    campaignCount: campaigns.n,
+  };
+}

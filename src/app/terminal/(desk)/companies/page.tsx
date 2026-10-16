@@ -12,7 +12,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { deleteCompanyAction, saveCompanyAction } from "@/lib/actions";
-import { getCompany, listCompanies } from "@/lib/db";
+import { currentBusiness } from "@/lib/current-business";
+import { getCompany, listCompanies } from "@/lib/directory";
 
 export default async function CompaniesPage({
   searchParams,
@@ -20,9 +21,10 @@ export default async function CompaniesPage({
   searchParams: Promise<{ edit?: string; error?: string; saved?: string }>;
 }) {
   const query = await searchParams;
+  const business = await currentBusiness();
   const editId = Number(query.edit);
-  const editing = Number.isInteger(editId) && editId > 0 ? getCompany(editId) : null;
-  const companies = listCompanies();
+  const editing = Number.isInteger(editId) && editId > 0 ? getCompany(business.id, editId) : null;
+  const companies = listCompanies(business.id);
 
   return (
     <>

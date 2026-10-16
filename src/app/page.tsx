@@ -1,19 +1,26 @@
 import { PublicSite } from "@/components/public-site";
-import { getProfile, getPublicMenu } from "@/lib/db";
+import { getHomepageBusiness } from "@/lib/businesses";
+import { getPublicMenu } from "@/lib/menu";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function generateMetadata() {
-  const profile = getProfile();
+  const business = getHomepageBusiness();
   return {
-    title: profile.name,
-    description: profile.about.slice(0, 160),
+    title: business.name,
+    description: business.about.slice(0, 160),
   };
 }
 
 export default function HomePage() {
-  const profile = getProfile();
-  const menu = getPublicMenu();
-  return <PublicSite profile={profile} menu={menu} />;
+  const business = getHomepageBusiness();
+  const menu = getPublicMenu(business.id);
+  return (
+    <PublicSite
+      profile={{ name: business.name, about: business.about }}
+      menu={menu}
+      businessSlug={business.slug}
+    />
+  );
 }

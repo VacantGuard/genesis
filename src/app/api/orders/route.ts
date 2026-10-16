@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
-import { OrderError, placeOrder } from "@/lib/db";
+import { getBusinessBySlug, getHomepageBusiness } from "@/lib/businesses";
+import { OrderError } from "@/lib/db";
+import { placeOrder } from "@/lib/orders";
 import { validateMockCard } from "@/lib/payment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Body = {
+  businessSlug?: string;
   customerName?: string;
   phone?: string;
   email?: string;
@@ -65,8 +68,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: card.error }, { status: 400 });
   }
 
+  const slug = clean(body.businessSlug, 80);
+  const business = slug ? getBusinessBySlug(slug) : getHomepageBusiness();
+  if (!business) {
+    return NextResponse.json({ error: "That menu is not available." }, { status: 400 });
+  }
+
   try {
-    const order = placeOrder({
+    const order = placeOrder(business.id, {
       customerName,
       phone,
       email,

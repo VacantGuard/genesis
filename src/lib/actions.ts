@@ -9,23 +9,26 @@ import {
   requireSession,
   setSessionCookie,
 } from "@/lib/auth";
+import { menuLink, updateBusinessProfile } from "@/lib/businesses";
+import { currentBusiness } from "@/lib/current-business";
+import {
+  deleteCompany,
+  deleteCustomer,
+  saveCompany,
+  saveCustomer,
+} from "@/lib/directory";
+import { OrderError } from "@/lib/db";
+import { parseDollarsToCents } from "@/lib/format";
 import {
   createCategory,
   createMenuItem,
   deleteCategory,
-  deleteCompany,
-  deleteCustomer,
   deleteMenuItem,
-  OrderError,
   renameCategory,
-  saveCompany,
-  saveCustomer,
-  sendCampaign,
   setMenuItemAvailability,
   updateMenuItem,
-  updateProfile,
-} from "@/lib/db";
-import { parseDollarsToCents } from "@/lib/format";
+} from "@/lib/menu";
+import { sendCampaign } from "@/lib/texts";
 
 export type LoginState = { error: string };
 
@@ -41,8 +44,15 @@ function bounce(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
 }
 
-function saved(path: string, message: string): never {
+async function deskBusiness() {
+  await requireSession();
+  return currentBusiness();
+}
+
+async function saved(path: string, message: string): Promise<never> {
+  const business = await currentBusiness();
   revalidatePath("/");
+  revalidatePath(`/b/${business.slug}`);
   revalidatePath(path);
   redirect(`${path}?saved=${encodeURIComponent(message)}`);
 }
@@ -70,7 +80,7 @@ export async function logoutAction() {
 }
 
 export async function saveProfileAction(formData: FormData) {
-  await requireSession();
+  const business = await deskBusiness();
   const name = field(formData, "name");
   const about = field(formData, "about");
   if (name.length < 2 || name.length > 80) {
@@ -79,38 +89,38 @@ export async function saveProfileAction(formData: FormData) {
   if (about.length < 10 || about.length > 4000) {
     bounce("/terminal/profile", "About copy needs between 10 and 4000 characters.");
   }
-  updateProfile(name, about);
-  saved("/terminal/profile", "Business profile saved. The public page will show it on the next load.");
+  updateBusinessProfile(business.id, name, about);
+  await saved("/terminal/profile", "Business profile saved. The public page will show it on the next load.");
 }
 
 export async function createCategoryAction(formData: FormData) {
-  await requireSession();
+  const business = await deskBusiness();
   const name = field(formData, "name");
   if (name.length < 2 || name.length > 40) {
     bounce("/terminal/menu", "Category names need 2 to 40 characters.");
   }
-  createCategory(name);
-  saved("/terminal/menu", `Added the ${name} category.`);
+  createCategory(business.id, name);
+  await saved("/terminal/menu", `Added the ${name} category.`);
 }
 
 export async function renameCategoryAction(formData: FormData) {
-  await requireSession();
+  const business = await deskBusiness();
   const id = optionalId(field(formData, "id"));
   const name = field(formData, "name");
   if (!id) bounce("/terminal/menu", "That category could not be found.");
   if (name.length < 2 || name.length > 40) {
     bounce("/terminal/menu", "Category names need 2 to 40 characters.");
   }
-  renameCategory(id, name);
-  saved("/terminal/menu", "Category renamed.");
+  renameCategory(business.id, id, name);
+  await saved("/terminal/menu", "Category renamed.");
 }
 
 export async function deleteCategoryAction(formData: FormData) {
-  await requireSession();
+  const business = await deskBusiness();
   const id = optionalId(field(formData, "id"));
   if (!id) bounce("/terminal/menu", "That category could not be found.");
-  deleteCategory(id);
-  saved("/terminal/menu", "Category and its meals were removed.");
+  deleteCategory(business.id, id);
+  await saved("/terminal/menu", "Category and its meals were removed.");
 }
 
 function readItem(formData: FormData) {
@@ -133,39 +143,43 @@ function readItem(formData: FormData) {
 }
 
 export async function createMenuItemAction(formData: FormData) {
-  await requireSession();
+  const business = await deskBusiness();
   const item = readItem(formData);
-  createMenuItem(item);
-  saved("/terminal/menu", `${item.name} is on the weekly menu.`);
+  const savedItem = createMenuItem({ businessId: business.id, ...item });
+  if (!savedItem) bounce("/terminal/menu", "That category is not on this business.");
+  await saved("/terminal/menu", `${item.name} is on the weekly menu.`);
 }
 
 export async function updateMenuItemAction(formData: FormData) {
-  await requireSession();
+  const business = await deskBusiness();
   const id = optionalId(field(formData, "id"));
   if (!id) bounce("/terminal/menu", "That meal could not be found.");
   const item = readItem(formData);
-  updateMenuItem({ id, ...item });
-  saved("/terminal/menu", `${item.name} was updated on the public menu.`);
+  const updated = updateMenuItem({ businessId: business.id, id, ...item });
+  if (!updated) bounce("/terminal/menu", "That meal is not on this business.");
+  await saved("/terminal/menu", `${item.name} was updated on the public menu.`);
 }
 
 export async function setAvailabilityAction(formData: FormData) {
-  await requireSession();
+  const business = await deskBusiness();
   const id = optionalId(field(formData, "id"));
   if (!id) bounce("/terminal/menu", "That meal could not be found.");
   const available = field(formData, "available") === "1";
-  setMenuItemAvailability(id, available);
-  saved(
+  const updated = setMenuItemAvailability(business.id, id, available);
+  if (!updated) bounce("/terminal/menu", "That meal is not on this business.");
+  await saved(
     "/terminal/menu",
     available ? "Meal is available on the public menu." : "Meal is marked sold out.",
   );
 }
 
 export async function deleteMenuItemAction(formData: FormData) {
-  await requireSession();
+  const business = await deskBusiness();
   const id = optionalId(field(formData, "id"));
   if (!id) bounce("/terminal/menu", "That meal could not be found.");
-  deleteMenuItem(id);
-  saved("/terminal/menu", "Meal removed from the menu.");
+  const removed = deleteMenuItem(business.id, id);
+  if (!removed) bounce("/terminal/menu", "That meal is not on this business.");
+  await saved("/terminal/menu", "Meal removed from the menu.");
 }
 
 function readCompany(formData: FormData) {
@@ -184,19 +198,19 @@ function readCompany(formData: FormData) {
 }
 
 export async function saveCompanyAction(formData: FormData) {
-  await requireSession();
+  const business = await deskBusiness();
   const id = optionalId(field(formData, "id"));
   const company = readCompany(formData);
-  saveCompany({ id, ...company });
-  saved("/terminal/companies", id ? "Company updated." : "Company added.");
+  saveCompany({ businessId: business.id, id, ...company });
+  await saved("/terminal/companies", id ? "Company updated." : "Company added.");
 }
 
 export async function deleteCompanyAction(formData: FormData) {
-  await requireSession();
+  const business = await deskBusiness();
   const id = optionalId(field(formData, "id"));
   if (!id) bounce("/terminal/companies", "That company could not be found.");
-  deleteCompany(id);
-  saved("/terminal/companies", "Company removed. Linked customers are now unassigned.");
+  deleteCompany(business.id, id);
+  await saved("/terminal/companies", "Company removed. Linked customers are now unassigned.");
 }
 
 function readCustomer(formData: FormData) {
@@ -222,19 +236,20 @@ function readCustomer(formData: FormData) {
 }
 
 export async function saveCustomerAction(formData: FormData) {
-  await requireSession();
+  const business = await deskBusiness();
   const id = optionalId(field(formData, "id"));
   const customer = readCustomer(formData);
-  saveCustomer({ id, ...customer });
-  saved("/terminal/customers", id ? "Customer updated." : "Customer added.");
+  const savedCustomer = saveCustomer({ businessId: business.id, id, ...customer });
+  if (!savedCustomer) bounce("/terminal/customers", "That company is not on this business.");
+  await saved("/terminal/customers", id ? "Customer updated." : "Customer added.");
 }
 
 export async function deleteCustomerAction(formData: FormData) {
-  await requireSession();
+  const business = await deskBusiness();
   const id = optionalId(field(formData, "id"));
   if (!id) bounce("/terminal/customers", "That customer could not be found.");
-  deleteCustomer(id);
-  saved("/terminal/customers", "Customer removed. Past orders stay on the list.");
+  deleteCustomer(business.id, id);
+  await saved("/terminal/customers", "Customer removed. Past orders stay on the list.");
 }
 
 export async function sendCampaignAction(input: {
@@ -242,7 +257,7 @@ export async function sendCampaignAction(input: {
   includeCustomers: boolean;
   includeCompanyContacts: boolean;
 }): Promise<{ ok: true; recipientCount: number; linkUrl: string } | { ok: false; error: string }> {
-  await requireSession();
+  const business = await deskBusiness();
   const message = input.message.trim();
   if (message.length < 2 || message.length > 480) {
     return { ok: false, error: "Write a message between 2 and 480 characters." };
@@ -252,12 +267,13 @@ export async function sendCampaignAction(input: {
   }
 
   const headerStore = await headers();
-  const host = headerStore.get("x-forwarded-host") || headerStore.get("host") || "localhost:43123";
+  const host = headerStore.get("x-forwarded-host") || headerStore.get("host") || "127.0.0.1:43123";
   const proto = headerStore.get("x-forwarded-proto") || "http";
-  const linkUrl = `${proto}://${host}/#pos`;
+  const linkUrl = menuLink(business.slug, `${proto}://${host}`);
 
   try {
     const result = sendCampaign({
+      businessId: business.id,
       message,
       linkUrl,
       includeCustomers: input.includeCustomers,

@@ -1,6 +1,6 @@
-# Hearth Prep
+# Meal prep desk
 
-A meal prep platform: a public one-page site and a private staff terminal that share one SQLite database.
+A meal prep platform sold as one product: each business has its own public menu, clients, and Slack workspace. The public site and the staff terminal share one SQLite database.
 
 The public page (`/`) has three sections:
 
@@ -8,9 +8,11 @@ The public page (`/`) has three sections:
 - **About** — copy from the editable business profile
 - **POS** — cart, customer details, and a practice card payment that records a paid order
 
-The staff terminal (`/terminal`) is a separate login-gated desk for the weekly menu, customers, companies, text campaigns, paid orders, and the business profile.
+The staff terminal (`/terminal`) is a separate login-gated desk for the open business: weekly menu, customers, companies, text campaigns, paid orders, the business profile, and the Slack workspace id. Switch businesses from the header. Add another business from the Business page. A new business starts empty.
 
-Payment and texting are local mocks. No card is charged, and no SMS leaves the machine. There is no delivery or driver workflow.
+The homepage (`/`) shows whichever business is marked as the homepage. Every business also has `/b/{slug}`.
+
+Payment is the practice card checkout. Texting writes the local text log. No card is charged, and no SMS leaves the machine. There is no delivery or driver workflow.
 
 ## Run it
 
@@ -48,7 +50,29 @@ Use a future expiry (`12/28`) and any 3-digit CVC. Only the last four digits are
 
 ## Text campaigns
 
-The terminal logs each outbound text locally and prints a line to the server console (`[local-sms]`). It does not call Twilio or any other SMS provider. Each campaign stores the public menu link that was included (`/#pos`).
+The terminal logs each outbound text locally and prints a line to the server console (`[local-sms]`). It does not call Twilio or any other SMS provider. Each campaign stores that business’s public menu link (`/b/{slug}#pos`).
+
+The Slack agent in `prep-desk` uses this same log. It does not send a second kind of text.
+
+## Slack agent
+
+`prep-desk` is the product agent. It is not tied to one kitchen. On a mention or direct message it reads the Slack workspace id and opens the business that has that id saved under Terminal → Slack. If the id is not saved, it replies with the workspace id and does not change a menu.
+
+From Slack, staff can ask it to read the weekly menu, change or remove a meal, or text that business’s clients. A real menu change logs a text to that business’s customers and company contacts, including the public menu link.
+
+Tokens are created with the BDK Slack wizard and stored in `prep-desk/.env.local` as `PREP_DESK_SLACK_BOT_TOKEN` and `PREP_DESK_SLACK_APP_TOKEN`. Do not put them in `.env`.
+
+```bash
+cd prep-desk
+npm install
+npx --yes "@cursor/bdk@0.2.25" login
+npx --yes "@cursor/bdk@0.2.25" slack create --dir .
+npm run dev
+```
+
+`npm run dev` loads the agent with the TypeScript loader so the tools can use the kitchen database. The kitchen app must already be running so both processes share `data/kitchen.sqlite`.
+
+Mention the bot, or send it a direct message, after the workspace id is saved on that business. The agent replies with the workspace id when it is not saved yet.
 
 ## Seeded sample data
 

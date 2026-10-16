@@ -20,9 +20,11 @@ type Confirmation = {
 export function PublicSite({
   profile,
   menu,
+  businessSlug,
 }: {
   profile: BusinessProfile;
   menu: PublicCategory[];
+  businessSlug: string;
 }) {
   const [cart, setCart] = useState<Record<number, number>>({});
   const [customerName, setCustomerName] = useState("");
@@ -87,6 +89,7 @@ export function PublicSite({
           email,
           companyName,
           notes,
+          businessSlug,
           card: { name: cardName, number: cardNumber, expiry, cvc },
           lines: lines.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity })),
         }),

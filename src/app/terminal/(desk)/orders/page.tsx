@@ -1,9 +1,11 @@
 import { buttonVariants } from "@/components/ui/button";
-import { listOrders } from "@/lib/db";
+import { currentBusiness } from "@/lib/current-business";
 import { formatMoney, formatWhen } from "@/lib/format";
+import { listOrders } from "@/lib/orders";
 
-export default function OrdersPage() {
-  const orders = listOrders();
+export default async function OrdersPage() {
+  const business = await currentBusiness();
+  const orders = listOrders(business.id);
 
   return (
     <>

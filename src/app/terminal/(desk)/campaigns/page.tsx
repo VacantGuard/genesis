@@ -1,12 +1,15 @@
 import { CampaignComposer } from "@/components/terminal/campaign-composer";
 import { Badge } from "@/components/ui/badge";
-import { listCampaigns, listCompanies, listCustomers } from "@/lib/db";
+import { currentBusiness } from "@/lib/current-business";
+import { listCompanies, listCustomers } from "@/lib/directory";
 import { formatWhen } from "@/lib/format";
+import { listCampaigns } from "@/lib/texts";
 
-export default function CampaignsPage() {
-  const customers = listCustomers();
-  const companies = listCompanies();
-  const campaigns = listCampaigns();
+export default async function CampaignsPage() {
+  const business = await currentBusiness();
+  const customers = listCustomers(business.id);
+  const companies = listCompanies(business.id);
+  const campaigns = listCampaigns(business.id);
 
   return (
     <>

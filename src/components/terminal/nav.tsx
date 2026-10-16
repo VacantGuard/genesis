@@ -12,6 +12,7 @@ const links = [
   { href: "/terminal/campaigns", label: "Texts" },
   { href: "/terminal/orders", label: "Orders" },
   { href: "/terminal/profile", label: "Business" },
+  { href: "/terminal/slack", label: "Slack" },
 ];
 
 export function TerminalNav() {
