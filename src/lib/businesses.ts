@@ -1,4 +1,5 @@
 import { getDb } from "./db.ts";
+import { SAMPLE_ABOUT, SAMPLE_NAME } from "./seed.ts";
 
 export type BusinessRecord = {
   id: number;
@@ -67,7 +68,7 @@ export function initTenancy() {
       .prepare("SELECT name, about, updated_at AS updatedAt FROM business_profile WHERE id = 1")
       .get() as { name: string; about: string; updatedAt: string } | undefined;
     if (profile) {
-      const slug = uniqueSlug(slugify(profile.name));
+      const slug = uniqueSlug(db, slugify(profile.name));
       db.prepare(
         `INSERT INTO businesses (slug, name, about, is_homepage, is_sample, updated_at)
          VALUES (?, ?, ?, 1, 1, ?)`,
@@ -85,8 +86,41 @@ export function initTenancy() {
   }
 }
 
-function uniqueSlug(base: string, exceptId?: number) {
-  const db = getDb();
+export function keepSampleAsNorthBowl(db: ReturnType<typeof getDb>) {
+  const extras = db
+    .prepare(
+      `SELECT id FROM businesses
+       WHERE is_homepage = 0
+         AND (SELECT COUNT(*) FROM menu_categories WHERE business_id = businesses.id) = 0
+         AND (SELECT COUNT(*) FROM customers WHERE business_id = businesses.id) = 0
+         AND (SELECT COUNT(*) FROM companies WHERE business_id = businesses.id) = 0
+         AND (SELECT COUNT(*) FROM orders WHERE business_id = businesses.id) = 0`,
+    )
+    .all() as { id: number }[];
+  for (const extra of extras) {
+    db.prepare("DELETE FROM campaigns WHERE business_id = ?").run(extra.id);
+    db.prepare("DELETE FROM businesses WHERE id = ?").run(extra.id);
+  }
+
+  const home = db
+    .prepare("SELECT id, name, about FROM businesses WHERE is_homepage = 1 LIMIT 1")
+    .get() as { id: number; name: string; about: string } | undefined;
+  if (!home || (home.name !== "Hearth Prep" && !home.about.startsWith("Hearth Prep is sample copy"))) return;
+
+  const now = new Date().toISOString();
+  db.prepare("UPDATE businesses SET name = ?, slug = ?, about = ?, updated_at = ? WHERE id = ?").run(
+    SAMPLE_NAME,
+    uniqueSlug(db, "north-bowl", home.id),
+    SAMPLE_ABOUT,
+    now,
+    home.id,
+  );
+  db.prepare(
+    "UPDATE business_profile SET name = ?, about = ?, updated_at = ? WHERE id = 1 AND (name = 'Hearth Prep' OR about LIKE 'Hearth Prep is sample copy%')",
+  ).run(SAMPLE_NAME, SAMPLE_ABOUT, now);
+}
+
+function uniqueSlug(db: ReturnType<typeof getDb>, base: string, exceptId?: number) {
   let slug = base;
   let n = 2;
   while (true) {
@@ -105,10 +139,6 @@ const selectBusiness = `
          slack_team_name AS slackTeamName
   FROM businesses
 `;
-
-export function listBusinesses(): BusinessRecord[] {
-  return (getDb().prepare(`${selectBusiness} ORDER BY name COLLATE NOCASE`).all() as BusinessRow[]).map(mapBusiness);
-}
 
 export function getBusiness(id: number): BusinessRecord | null {
   const row = getDb().prepare(`${selectBusiness} WHERE id = ?`).get(id) as BusinessRow | undefined;
@@ -131,19 +161,6 @@ export function getHomepageBusiness(): BusinessRecord {
   const any = getDb().prepare(`${selectBusiness} ORDER BY id LIMIT 1`).get() as BusinessRow | undefined;
   if (!any) throw new Error("No business is configured.");
   return mapBusiness(any);
-}
-
-export function createBusiness(name: string, about: string) {
-  const db = getDb();
-  const slug = uniqueSlug(slugify(name));
-  const homepage = db.prepare("SELECT COUNT(*) AS n FROM businesses WHERE is_homepage = 1").get() as { n: number };
-  const result = db
-    .prepare(
-      `INSERT INTO businesses (slug, name, about, is_homepage, is_sample, updated_at)
-       VALUES (?, ?, ?, ?, 0, ?)`,
-    )
-    .run(slug, name, about, homepage.n === 0 ? 1 : 0, new Date().toISOString());
-  return getBusiness(Number(result.lastInsertRowid))!;
 }
 
 export function updateBusinessProfile(id: number, name: string, about: string) {

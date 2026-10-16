@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { saveProfileAction } from "@/lib/actions";
-import { createBusinessAction } from "@/lib/business-actions";
 import { currentBusiness } from "@/lib/current-business";
 
 export default async function ProfilePage({
@@ -35,27 +34,6 @@ export default async function ProfilePage({
         </label>
         <div>
           <Button type="submit">Save profile</Button>
-        </div>
-      </form>
-      <form action={createBusinessAction} className="grid max-w-2xl gap-3 rounded-xl border bg-card p-4">
-        <div>
-          <h2 className="font-heading text-2xl tracking-tight">Another business</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            A new business starts with an empty menu and its own public page. It does not copy this menu or these clients.
-          </p>
-        </div>
-        <label className="grid gap-1.5 text-sm">
-          <span className="font-medium">Name</span>
-          <Input name="name" required className="h-10 bg-background" />
-        </label>
-        <label className="grid gap-1.5 text-sm">
-          <span className="font-medium">About</span>
-          <Textarea name="about" required className="min-h-32 bg-background" />
-        </label>
-        <div>
-          <Button type="submit" variant="outline">
-            Add business
-          </Button>
         </div>
       </form>
     </>

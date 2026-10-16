@@ -1,11 +1,13 @@
 import type Database from "better-sqlite3";
 
-const SAMPLE_NAME = "Hearth Prep";
+export const SAMPLE_NAME = "North Bowl";
 const SAMPLE_ABOUT = [
-  "Hearth Prep is sample copy for a meal prep kitchen. Rewrite it from the staff terminal when this business is real.",
+  "North Bowl is sample copy for a meal prep kitchen. Rewrite it from the staff terminal when this business is real.",
   "Each week the kitchen cooks a short menu of portioned meals: breakfasts, mains, and sides you can heat through the week. Order and pay on this page. Meals are packed for pickup at the kitchen.",
   "Sample prep day is Sunday, with pickup Monday to Wednesday. Change the name, this story, and the weekly menu whenever the cook cycle changes. Delivery routing is not part of this desk.",
 ].join("\n\n");
+
+export { SAMPLE_ABOUT };
 
 function insertSampleMenu(db: Database.Database) {
   const category = db.prepare(

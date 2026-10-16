@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { BusinessBar } from "@/components/terminal/business-bar";
 import { TerminalNav } from "@/components/terminal/nav";
 import { logoutAction } from "@/lib/actions";
 import { requireSession } from "@/lib/auth";
@@ -24,7 +23,6 @@ export default async function DeskLayout({ children }: { children: React.ReactNo
             <p className="font-heading text-xl tracking-tight">{business.name}</p>
           </div>
           <div className="flex items-center gap-3 text-sm">
-            <BusinessBar />
             <span className="hidden text-muted-foreground sm:inline">{session.username}</span>
             <Link href={`/b/${business.slug}`} className="text-muted-foreground hover:text-foreground">
               Public menu

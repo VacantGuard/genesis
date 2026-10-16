@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
-import { initTenancy } from "./businesses.ts";
+import { initTenancy, keepSampleAsNorthBowl } from "./businesses.ts";
 import { reframeLegacyLunchSample, seed } from "./seed.ts";
 export class OrderError extends Error {}
 
@@ -136,6 +136,7 @@ export function getDb() {
     globalForDb.tenancyReady = true;
     initTenancy();
   }
+  keepSampleAsNorthBowl(globalForDb.kitchenDb);
   return globalForDb.kitchenDb;
 }
 

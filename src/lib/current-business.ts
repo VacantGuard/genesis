@@ -10,14 +10,3 @@ export async function currentBusiness(): Promise<BusinessRecord> {
   }
   return getHomepageBusiness();
 }
-
-export async function rememberBusiness(id: number) {
-  const jar = await cookies();
-  jar.set("kitchen_business", String(id), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
-}

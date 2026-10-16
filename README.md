@@ -1,6 +1,6 @@
 # Meal prep desk
 
-A meal prep platform sold as one product: each business has its own public menu, clients, and Slack workspace. The public site and the staff terminal share one SQLite database.
+A meal prep platform sold to meal prep businesses. A buyer configures one business: its public menu, clients, and Slack workspace. The public site and the staff terminal share one SQLite database.
 
 The public page (`/`) has three sections:
 
@@ -8,9 +8,9 @@ The public page (`/`) has three sections:
 - **About** — copy from the editable business profile
 - **POS** — cart, customer details, and a practice card payment that records a paid order
 
-The staff terminal (`/terminal`) is a separate login-gated desk for the open business: weekly menu, customers, companies, text campaigns, paid orders, the business profile, and the Slack workspace id. Switch businesses from the header. Add another business from the Business page. A new business starts empty.
+The staff terminal (`/terminal`) is a separate login-gated desk for that business: weekly menu, customers, companies, text campaigns, paid orders, the business profile, and the Slack workspace id.
 
-The homepage (`/`) shows whichever business is marked as the homepage. Every business also has `/b/{slug}`.
+The homepage (`/`) and `/b/{slug}` show the same business.
 
 Payment is the practice card checkout. Texting writes the local text log. No card is charged, and no SMS leaves the machine. There is no delivery or driver workflow.
 
@@ -78,7 +78,7 @@ Mention the bot, or send it a direct message, after the workspace id is saved on
 
 The first launch inserts sample content you can edit or delete:
 
-- Business name **Hearth Prep** and about copy for a meal prep kitchen
+- Business name **North Bowl** and about copy for a meal prep kitchen
 - A weekly portioned menu (breakfasts, mains, sides) with one sold-out meal
 - Company **Sample Studio Co.** and three sample customers (555 numbers and `.example` emails)
 
