@@ -53,8 +53,9 @@ export default async function AgentPage({
       <section className="grid max-w-2xl gap-2 text-sm">
         <h2 className="font-heading text-2xl tracking-tight">Menu memory</h2>
         <p className="text-muted-foreground">
-          The Slack agent answers menu and client questions from this page. It lists the meals on
-          the menu now, each recent change, and every saved client name and phone.
+          The Slack agent answers menu, client, and payment questions from this page. Clients stay
+          on the Customers page. A paid checkout is an order matched by phone. This page lists
+          both, so the agent does not need a separate client file.
         </p>
         <p className="break-all text-muted-foreground">{memoryUrl}</p>
       </section>

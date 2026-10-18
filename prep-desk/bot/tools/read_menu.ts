@@ -1,16 +1,17 @@
 import { defineTool } from "@cursor/bdk/tools";
 import { z } from "zod";
-import { getPublicMenu, listCustomers, listTriggers, operatingBusiness } from "../lib/kitchen";
+import { getPublicMenu, listTriggers, operatingBusiness, orderBoard } from "../lib/kitchen";
 
 export default defineTool({
   description:
-    "Read the weekly menu, recent changes, and saved clients for the business connected to this Slack workspace. Use this before answering what is on the menu, what was added, or who the clients are.",
+    "Read the weekly menu, recent changes, saved clients, and who has paid since the latest menu update. Use this before answering what is on the menu, what was added, who the clients are, or who paid.",
   inputSchema: z.object({
     businessSlug: z.string().optional().describe("Only when this call is not from Slack."),
   }),
   execute({ businessSlug }, ctx) {
     const operating = operatingBusiness(ctx.session.auth, businessSlug);
     if (!operating.ok) return { error: operating.error };
+    const board = orderBoard(operating.business.id);
     return {
       business: operating.business.name,
       slug: operating.business.slug,
@@ -19,12 +20,22 @@ export default defineTool({
         createdAt: change.createdAt,
       })),
       menu: getPublicMenu(operating.business.id),
-      clients: listCustomers(operating.business.id).map((customer) => ({
-        name: customer.name,
-        phone: customer.phone,
-        email: customer.email,
-        company: customer.companyName,
-      })),
+      clients: [
+        ...board.ordered.map((order) => ({
+          name: order.name,
+          phone: order.phone,
+          email: order.email,
+          paid: true,
+          orderNumber: order.orderNumber,
+        })),
+        ...board.notOrdered.map((client) => ({
+          name: client.name,
+          phone: client.phone,
+          email: client.email,
+          paid: false,
+          orderNumber: "",
+        })),
+      ],
     };
   },
 });

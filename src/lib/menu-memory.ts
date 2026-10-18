@@ -1,4 +1,4 @@
-import { listTriggers } from "./agent";
+import { listTriggers, orderBoard } from "./agent";
 import { menuLink, type BusinessRecord } from "./businesses";
 import { listCompanies, listCustomers } from "./directory";
 import { formatMoney, formatWhen } from "./format";
@@ -42,15 +42,36 @@ export function renderMenuMemory(business: BusinessRecord, origin?: string) {
       if (item.description) lines.push(`  ${item.description}`);
     }
   }
+  const board = orderBoard(business.id);
   lines.push("", "## Clients");
   const customers = listCustomers(business.id);
   if (customers.length === 0) {
-    lines.push("No clients are saved.");
+    lines.push("No clients are saved. Add them on the Customers page. An order is matched to a client by phone.");
   }
   for (const customer of customers) {
     const contact = [customer.phone, customer.email].filter(Boolean).join(", ");
     const company = customer.companyName ? ` (${customer.companyName})` : "";
     lines.push(`- ${customer.name}${company}${contact ? ` — ${contact}` : ""}`);
+  }
+  lines.push("", "## Who paid");
+  lines.push("Paid means a checkout order since the latest menu update. Match is by phone, then by name.");
+  if (!board.trigger) lines.push("No menu update is saved yet, so this list is every order on the desk.");
+  if (board.ordered.length === 0) {
+    lines.push("Nobody has paid since that menu update.");
+  }
+  for (const order of board.ordered) {
+    const contact = [order.phone, order.email].filter(Boolean).join(", ");
+    lines.push(
+      `- ${order.name}${contact ? ` — ${contact}` : ""} — paid — order ${order.orderNumber} — ${formatWhen(order.createdAt)}`,
+    );
+  }
+  lines.push("", "## Who has not paid");
+  if (board.notOrdered.length === 0) {
+    lines.push("Every saved client has paid since that menu update.");
+  }
+  for (const client of board.notOrdered) {
+    const contact = [client.phone, client.email].filter(Boolean).join(", ");
+    lines.push(`- ${client.name}${contact ? ` — ${contact}` : ""} — not paid`);
   }
   const companies = listCompanies(business.id);
   if (companies.length > 0) {
