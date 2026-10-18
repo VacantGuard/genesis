@@ -64,6 +64,11 @@ export default async function AgentPage({
           HTTP Request node, GET /api/agent/status, header Authorization: Bearer {settings.token}
         </p>
         <p className="text-muted-foreground">
+          Text clients with POST /api/agent/texts and the same Bearer token. The body is{" "}
+          {`{"message":"This week's menu is ready."}`} and the menu link is added for you. Twilio has
+          to be saved on Texts first, or the send is only logged.
+        </p>
+        <p className="text-muted-foreground">
           The public menu JSON is GET /api/menu and does not need the token. The Slack workspace id
           for this business is saved on the Slack page and is included on each trigger.
         </p>
