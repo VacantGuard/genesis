@@ -189,9 +189,18 @@ export async function sendTextMessage(credentials: TextCredentials, to: string, 
       body: JSON.stringify({ number: destination, from_number: credentials.fromNumber, content: body }),
       signal: AbortSignal.timeout(12000),
     });
-    const json = (await response.json().catch(() => ({}))) as { message?: string; error?: string; status?: string; message_handle?: string };
+    const json = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      error?: string;
+      error_message?: string;
+      status?: string;
+      message_handle?: string;
+    };
     if (!response.ok || json.status === "ERROR") {
-      return { ok: false as const, detail: json.message || json.error || `Sendblue returned ${response.status}.` };
+      return {
+        ok: false as const,
+        detail: json.error_message || json.message || json.error || `Sendblue returned ${response.status}.`,
+      };
     }
     return { ok: true as const, detail: json.message_handle || json.status || "sent" };
   } catch (error) {
