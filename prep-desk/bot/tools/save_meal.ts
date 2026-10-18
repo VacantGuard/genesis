@@ -29,7 +29,7 @@ export default defineTool({
     available: z.boolean().default(true),
     businessSlug: z.string().optional().describe("Only when this call is not from Slack."),
   }),
-  execute(input, ctx) {
+  async execute(input, ctx) {
     const operating = operatingBusiness(ctx.session.auth, input.businessSlug);
     if (!operating.ok) return { error: operating.error };
     const priceCents = parseDollarsToCents(input.priceDollars);
@@ -75,7 +75,7 @@ export default defineTool({
 
     const dollars = (priceCents / 100).toFixed(2);
     const state = input.available ? "available" : "sold out";
-    const notice = notifyMenuChange(
+    const notice = await notifyMenuChange(
       business,
       `${business.name} updated the weekly menu. ${input.name} is ${state} in ${input.category} for $${dollars}.`,
     );

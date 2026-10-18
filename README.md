@@ -74,6 +74,8 @@ npm run dev
 
 Mention the bot, or send it a direct message, after the workspace id is saved on that business. The agent replies with the workspace id when it is not saved yet.
 
+The agent you talk to in Slack runs in n8n. On the staff Agent page, paste the n8n webhook URL. A menu save POSTs a trigger there with the new menu link and each client. n8n can read who has ordered with `GET /api/agent/status` and the token shown on that page. The public menu JSON is `GET /api/menu`.
+
 ## Seeded sample data
 
 The first launch inserts sample content you can edit or delete:

@@ -11,6 +11,7 @@ import {
   listCategories,
   updateMenuItem,
 } from "../../../src/lib/menu";
+import { orderBoard, publishMenuUpdate } from "../../../src/lib/agent";
 import { sendCampaign } from "../../../src/lib/texts";
 
 const candidates = [
@@ -47,20 +48,15 @@ export function operatingBusiness(auth: { attributes?: Record<string, string> } 
   };
 }
 
-export function notifyMenuChange(business: BusinessRecord, sentence: string) {
-  try {
-    const result = sendCampaign({
-      businessId: business.id,
-      message: sentence,
-      linkUrl: menuLink(business.slug),
-      includeCustomers: true,
-      includeCompanyContacts: true,
-    });
-    return { texted: true as const, recipientCount: result.recipientCount, linkUrl: result.linkUrl };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "The text log did not record this change.";
-    return { texted: false as const, reason: message };
-  }
+export async function notifyMenuChange(business: BusinessRecord, sentence: string) {
+  const result = await publishMenuUpdate({ business, summary: sentence });
+  return {
+    triggerId: result.triggerId,
+    delivery: result.delivery,
+    clientCount: result.clientCount,
+    menuUrl: result.menuUrl,
+    detail: result.detail,
+  };
 }
 
 export {
@@ -75,4 +71,5 @@ export {
   updateMenuItem,
   sendCampaign,
   menuLink,
+  orderBoard,
 };

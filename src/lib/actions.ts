@@ -9,7 +9,8 @@ import {
   requireSession,
   setSessionCookie,
 } from "@/lib/auth";
-import { menuLink, updateBusinessProfile } from "@/lib/businesses";
+import { publishMenuUpdate } from "@/lib/agent";
+import { menuLink, updateBusinessProfile, type BusinessRecord } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
 import {
   deleteCompany,
@@ -47,6 +48,16 @@ function bounce(path: string, message: string): never {
 async function deskBusiness() {
   await requireSession();
   return currentBusiness();
+}
+async function tellAgent(business: BusinessRecord, summary: string, staffMessage: string) {
+  const headerStore = await headers();
+  const host = headerStore.get("x-forwarded-host") || headerStore.get("host") || "127.0.0.1:43123";
+  const proto = headerStore.get("x-forwarded-proto") || "http";
+  const result = await publishMenuUpdate({ business, summary, origin: `${proto}://${host}` });
+  const note = result.delivery === "sent"
+    ? ` Slack can send ${result.menuUrl} to ${result.clientCount} clients.`
+    : " Add the n8n webhook on the Agent page so Slack can send clients the link.";
+  await saved("/terminal/menu", `${staffMessage}${note}`);
 }
 
 async function saved(path: string, message: string): Promise<never> {
@@ -112,7 +123,7 @@ export async function renameCategoryAction(formData: FormData) {
     bounce("/terminal/menu", "Category names need 2 to 40 characters.");
   }
   renameCategory(business.id, id, name);
-  await saved("/terminal/menu", "Category renamed.");
+  await tellAgent(business, `${name} is the new category name.`, "Category renamed.");
 }
 
 export async function deleteCategoryAction(formData: FormData) {
@@ -120,7 +131,7 @@ export async function deleteCategoryAction(formData: FormData) {
   const id = optionalId(field(formData, "id"));
   if (!id) bounce("/terminal/menu", "That category could not be found.");
   deleteCategory(business.id, id);
-  await saved("/terminal/menu", "Category and its meals were removed.");
+  await tellAgent(business, "A menu category and its meals were removed.", "Category and its meals were removed.");
 }
 
 function readItem(formData: FormData) {
@@ -147,7 +158,7 @@ export async function createMenuItemAction(formData: FormData) {
   const item = readItem(formData);
   const savedItem = createMenuItem({ businessId: business.id, ...item });
   if (!savedItem) bounce("/terminal/menu", "That category is not on this business.");
-  await saved("/terminal/menu", `${item.name} is on the weekly menu.`);
+  await tellAgent(business, `${item.name} is on the weekly menu.`, `${item.name} is on the weekly menu.`);
 }
 
 export async function updateMenuItemAction(formData: FormData) {
@@ -157,7 +168,7 @@ export async function updateMenuItemAction(formData: FormData) {
   const item = readItem(formData);
   const updated = updateMenuItem({ businessId: business.id, id, ...item });
   if (!updated) bounce("/terminal/menu", "That meal is not on this business.");
-  await saved("/terminal/menu", `${item.name} was updated on the public menu.`);
+  await tellAgent(business, `${item.name} was updated on the weekly menu.`, `${item.name} was updated on the public menu.`);
 }
 
 export async function setAvailabilityAction(formData: FormData) {
@@ -167,8 +178,9 @@ export async function setAvailabilityAction(formData: FormData) {
   const available = field(formData, "available") === "1";
   const updated = setMenuItemAvailability(business.id, id, available);
   if (!updated) bounce("/terminal/menu", "That meal is not on this business.");
-  await saved(
-    "/terminal/menu",
+  await tellAgent(
+    business,
+    available ? "A meal is available again." : "A meal is sold out.",
     available ? "Meal is available on the public menu." : "Meal is marked sold out.",
   );
 }
@@ -179,7 +191,7 @@ export async function deleteMenuItemAction(formData: FormData) {
   if (!id) bounce("/terminal/menu", "That meal could not be found.");
   const removed = deleteMenuItem(business.id, id);
   if (!removed) bounce("/terminal/menu", "That meal is not on this business.");
-  await saved("/terminal/menu", "Meal removed from the menu.");
+  await tellAgent(business, "A meal was removed from the weekly menu.", "Meal removed from the menu.");
 }
 
 function readCompany(formData: FormData) {

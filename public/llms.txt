@@ -1,0 +1,10 @@
+# North Bowl meal prep desk
+
+The public menu is for clients. Staff talk to their agent in Slack. The agent runs in n8n.
+
+- Menu page: /b/north-bowl
+- Menu JSON: /api/menu
+- Who ordered: GET /api/agent/status with Authorization: Bearer <token from the staff Agent page>
+- Menu updates POST a JSON trigger to the n8n webhook saved on that page. The body includes menuUrl and each client.
+
+The staff desk is /terminal and is not part of the client menu.

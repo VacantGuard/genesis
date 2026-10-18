@@ -32,7 +32,7 @@ export default async function MenuPage({
       <div>
         <h1 className="font-heading text-3xl tracking-tight">Weekly menu</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Saves show on the public page the next time it loads.
+          A save updates the public menu and tells the Slack agent, through n8n, to send clients the new link.
         </p>
       </div>
       <Flash error={query.error} saved={query.saved} />
