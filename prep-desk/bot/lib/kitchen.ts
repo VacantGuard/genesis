@@ -11,7 +11,7 @@ import {
   listCategories,
   updateMenuItem,
 } from "../../../src/lib/menu";
-import { orderBoard, publishMenuUpdate } from "../../../src/lib/agent";
+import { listTriggers, orderBoard, publishMenuUpdate } from "../../../src/lib/agent";
 import { sendCampaign } from "../../../src/lib/texts";
 
 const candidates = [
@@ -72,4 +72,5 @@ export {
   sendCampaign,
   menuLink,
   orderBoard,
+  listTriggers,
 };

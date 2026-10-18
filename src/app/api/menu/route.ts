@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { listTriggers } from "@/lib/agent";
 import { getBusinessBySlug, getHomepageBusiness, menuLink } from "@/lib/businesses";
+import { publicOrigin } from "@/lib/menu-memory";
 import { getPublicMenu } from "@/lib/menu";
 
 export const runtime = "nodejs";
@@ -14,7 +16,11 @@ export async function GET(request: Request) {
   return NextResponse.json({
     business: business.name,
     slug: business.slug,
-    menuUrl: menuLink(business.slug),
+    menuUrl: menuLink(business.slug, publicOrigin(request)),
+    recentChanges: listTriggers(business.id).map((change) => ({
+      summary: change.summary,
+      createdAt: change.createdAt,
+    })),
     menu: getPublicMenu(business.id),
   });
 }

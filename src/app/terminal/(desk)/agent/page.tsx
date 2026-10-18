@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { Flash } from "@/components/flash";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,10 @@ export default async function AgentPage({
   const business = await currentBusiness();
   const settings = agentSettings(business.id);
   const triggers = listTriggers(business.id);
+  const headerStore = await headers();
+  const host = headerStore.get("x-forwarded-host") || headerStore.get("host") || "127.0.0.1:43123";
+  const proto = headerStore.get("x-forwarded-proto") || "http";
+  const memoryUrl = `${proto}://${host}/api/menu/memory`;
 
   return (
     <>
@@ -45,6 +50,14 @@ export default async function AgentPage({
           <Button type="submit">Save webhook</Button>
         </div>
       </form>
+      <section className="grid max-w-2xl gap-2 text-sm">
+        <h2 className="font-heading text-2xl tracking-tight">Menu memory</h2>
+        <p className="text-muted-foreground">
+          The Slack agent answers menu questions from this page. It lists the meals on the menu now
+          and each recent change. Paste the page into the agent instructions.
+        </p>
+        <p className="break-all text-muted-foreground">{memoryUrl}</p>
+      </section>
       <section className="grid max-w-2xl gap-2 text-sm">
         <h2 className="font-heading text-2xl tracking-tight">What n8n can ask</h2>
         <p className="text-muted-foreground">
