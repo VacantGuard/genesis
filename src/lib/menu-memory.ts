@@ -44,3 +44,11 @@ export function renderMenuMemory(business: BusinessRecord, origin?: string) {
   lines.push("");
   return lines.join("\n");
 }
+
+export function renderMenuMemoryPage(business: BusinessRecord, origin?: string) {
+  const text = renderMenuMemory(business, origin)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${business.name} menu memory</title></head><body><pre>${text}</pre></body></html>\n`;
+}
