@@ -1,5 +1,6 @@
 import { listTriggers } from "./agent";
 import { menuLink, type BusinessRecord } from "./businesses";
+import { listCompanies, listCustomers } from "./directory";
 import { formatMoney, formatWhen } from "./format";
 import { getPublicMenu } from "./menu";
 
@@ -39,6 +40,25 @@ export function renderMenuMemory(business: BusinessRecord, origin?: string) {
       const state = item.available ? "available" : "unavailable";
       lines.push(`- ${item.name} — ${formatMoney(item.priceCents)} — ${state}`);
       if (item.description) lines.push(`  ${item.description}`);
+    }
+  }
+  lines.push("", "## Clients");
+  const customers = listCustomers(business.id);
+  if (customers.length === 0) {
+    lines.push("No clients are saved.");
+  }
+  for (const customer of customers) {
+    const contact = [customer.phone, customer.email].filter(Boolean).join(", ");
+    const company = customer.companyName ? ` (${customer.companyName})` : "";
+    lines.push(`- ${customer.name}${company}${contact ? ` — ${contact}` : ""}`);
+  }
+  const companies = listCompanies(business.id);
+  if (companies.length > 0) {
+    lines.push("", "## Company contacts");
+    for (const company of companies) {
+      const who = company.contactName || company.name;
+      const contact = [company.phone, company.email].filter(Boolean).join(", ");
+      lines.push(`- ${who} at ${company.name}${contact ? ` — ${contact}` : ""}`);
     }
   }
   lines.push("");

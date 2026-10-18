@@ -9,6 +9,13 @@ type SmsRecipient = {
   kind: "customer" | "company_contact";
 };
 
+export type CampaignRecipient = {
+  name: string;
+  phone: string;
+  status: "logged" | "sent" | "failed";
+  detail: string;
+};
+
 function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
 }
@@ -85,17 +92,35 @@ export async function sendCampaign(input: {
       failedCount: 0,
       linkUrl: input.linkUrl,
       mode: "logged" as const,
+      recipients: recipients.map(
+        (recipient): CampaignRecipient => ({
+          name: recipient.name,
+          phone: recipient.phone,
+          status: "logged",
+          detail: "",
+        }),
+      ),
     };
   }
 
   let sentCount = 0;
   let failedCount = 0;
+  const outcomes: CampaignRecipient[] = [];
   const mark = db.prepare("UPDATE sms_log SET status = ?, detail = ? WHERE id = ?");
-  for (const recipient of recorded.ids) {
-    const result = await sendTextMessage(credentials, recipient.phone, body);
+  for (let index = 0; index < recorded.ids.length; index += 1) {
+    const row = recorded.ids[index];
+    const recipient = recipients[index];
+    const result = await sendTextMessage(credentials, row.phone, body);
+    const status = result.ok ? "sent" : "failed";
     if (result.ok) sentCount += 1;
     else failedCount += 1;
-    mark.run(result.ok ? "sent" : "failed", result.detail, recipient.id);
+    mark.run(status, result.detail, row.id);
+    outcomes.push({
+      name: recipient.name,
+      phone: recipient.phone,
+      status,
+      detail: result.detail,
+    });
   }
   return {
     campaignId: recorded.campaignId,
@@ -104,6 +129,7 @@ export async function sendCampaign(input: {
     failedCount,
     linkUrl: input.linkUrl,
     mode: "sent" as const,
+    recipients: outcomes,
   };
 }
 

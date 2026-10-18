@@ -45,6 +45,7 @@ export async function POST(request: Request) {
       failedCount: result.failedCount,
       mode: result.mode,
       linkUrl: result.linkUrl,
+      recipients: result.recipients,
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "The text could not be sent.";

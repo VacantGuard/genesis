@@ -53,8 +53,8 @@ export default async function AgentPage({
       <section className="grid max-w-2xl gap-2 text-sm">
         <h2 className="font-heading text-2xl tracking-tight">Menu memory</h2>
         <p className="text-muted-foreground">
-          The Slack agent answers menu questions from this page. It lists the meals on the menu now
-          and each recent change. Paste the page into the agent instructions.
+          The Slack agent answers menu and client questions from this page. It lists the meals on
+          the menu now, each recent change, and every saved client name and phone.
         </p>
         <p className="break-all text-muted-foreground">{memoryUrl}</p>
       </section>
@@ -65,7 +65,8 @@ export default async function AgentPage({
         </p>
         <p className="text-muted-foreground">
           Text clients with POST /api/agent/texts and the same Bearer token. The body is{" "}
-          {`{"message":"This week's menu is ready."}`} and the menu link is added for you. A text
+          {`{"message":"This week's menu is ready."}`} and the menu link is added for you. The
+          reply names each recipient, their phone, and whether that text sent or failed. A text
           platform has to be saved on Texts first, or the send is only logged.
         </p>
         <p className="text-muted-foreground">

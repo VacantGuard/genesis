@@ -31,6 +31,7 @@ export default defineTool({
         failedCount: result.failedCount,
         mode: result.mode,
         linkUrl: result.linkUrl,
+        recipients: result.recipients,
       };
     } catch (error) {
       return { error: error instanceof Error ? error.message : "The text log did not record this message." };

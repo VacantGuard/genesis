@@ -12,6 +12,7 @@ import {
   updateMenuItem,
 } from "../../../src/lib/menu";
 import { listTriggers, orderBoard, publishMenuUpdate } from "../../../src/lib/agent";
+import { listCompanies, listCustomers } from "../../../src/lib/directory";
 import { sendCampaign } from "../../../src/lib/texts";
 
 const candidates = [
@@ -70,6 +71,8 @@ export {
   parseDollarsToCents,
   updateMenuItem,
   sendCampaign,
+  listCustomers,
+  listCompanies,
   menuLink,
   orderBoard,
   listTriggers,
