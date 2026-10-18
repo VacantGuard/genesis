@@ -78,6 +78,7 @@ export type SmsDelivery = {
   phone: string;
   body: string;
   status: string;
+  detail: string;
   createdAt: string;
 };
 

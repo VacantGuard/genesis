@@ -10,9 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 export function CampaignComposer({
   customers,
   companies,
+  menuUrl,
+  textingReady,
 }: {
   customers: Customer[];
   companies: Company[];
+  menuUrl: string;
+  textingReady: boolean;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState(
@@ -45,8 +49,7 @@ export function CampaignComposer({
   }, [companies, customers, includeCompanyContacts, includeCustomers]);
 
   function insertLink() {
-    const link = `${window.location.origin}/#pos`;
-    setMessage((current) => (current.includes(link) ? current : `${current.trim()}\n${link}`.trim()));
+    setMessage((current) => (current.includes(menuUrl) ? current : `${current.trim()}\n${menuUrl}`.trim()));
   }
 
   async function onSubmit(event: React.FormEvent) {
@@ -64,9 +67,14 @@ export function CampaignComposer({
       setError(result.error);
       return;
     }
-    setStatus(
-      `Logged ${result.recipientCount} text${result.recipientCount === 1 ? "" : "s"} with ${result.linkUrl}. No phone network was contacted.`,
-    );
+    const noun = result.recipientCount === 1 ? "text" : "texts";
+    if (result.mode === "logged") {
+      setStatus(`Logged ${result.recipientCount} ${noun}. Connect a text platform above before a phone can receive them.`);
+    } else if (result.failedCount > 0) {
+      setStatus(`Sent ${result.sentCount}. ${result.failedCount} failed. The reason is in the history below.`);
+    } else {
+      setStatus(`Sent ${result.sentCount} ${noun} with ${result.linkUrl}.`);
+    }
     router.refresh();
   }
 
@@ -123,7 +131,7 @@ export function CampaignComposer({
 
       <div className="rounded-lg border bg-card p-3">
         <p className="text-sm font-medium">
-          {recipients.length} phone{recipients.length === 1 ? "" : "s"} will be logged
+          {recipients.length} phone{recipients.length === 1 ? "" : "s"} will be {textingReady ? "texted" : "logged"}
         </p>
         {recipients.length === 0 ? (
           <p className="mt-1 text-sm text-muted-foreground">
@@ -153,7 +161,7 @@ export function CampaignComposer({
 
       <div>
         <Button type="submit" disabled={pending || recipients.length === 0}>
-          {pending ? "Logging texts…" : "Log campaign"}
+          {pending ? "Sending…" : textingReady ? "Send texts" : "Log campaign"}
         </Button>
       </div>
     </form>

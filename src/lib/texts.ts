@@ -1,5 +1,6 @@
 import { getDb, OrderError } from "./db.ts";
 import { listCompanies, listCustomers } from "./directory.ts";
+import { sendTextMessage, textCredentials, textSettings } from "./messaging.ts";
 import type { Campaign, SmsDelivery } from "./types.ts";
 
 type SmsRecipient = {
@@ -12,7 +13,7 @@ function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
 }
 
-export function sendCampaign(input: {
+export async function sendCampaign(input: {
   businessId: number;
   message: string;
   linkUrl: string;
@@ -41,6 +42,7 @@ export function sendCampaign(input: {
   }
   if (recipients.length === 0) throw new OrderError("That audience has no phone numbers to log.");
 
+  const credentials = textCredentials(input.businessId);
   const body = input.message.includes(input.linkUrl)
     ? input.message
     : `${input.message.trim()}\n${input.linkUrl}`;
@@ -64,21 +66,49 @@ export function sendCampaign(input: {
     const campaignId = Number(campaign.lastInsertRowid);
     const log = db.prepare(
       `INSERT INTO sms_log
-        (campaign_id, recipient_name, recipient_kind, phone, body, status, created_at)
-       VALUES (?, ?, ?, ?, ?, 'logged', ?)`,
+        (campaign_id, recipient_name, recipient_kind, phone, body, status, detail, created_at)
+       VALUES (?, ?, ?, ?, ?, 'logged', '', ?)`,
     );
+    const ids: { id: number; phone: string }[] = [];
     for (const recipient of recipients) {
-      log.run(campaignId, recipient.name, recipient.kind, recipient.phone, body, createdAt);
-      console.info(
-        `[local-sms] status=logged to=${recipient.phone} name=${recipient.name} campaign=${campaignId}`,
-      );
+      const inserted = log.run(campaignId, recipient.name, recipient.kind, recipient.phone, body, createdAt);
+      ids.push({ id: Number(inserted.lastInsertRowid), phone: recipient.phone });
     }
-    return { campaignId, recipientCount: recipients.length, linkUrl: input.linkUrl };
+    return { campaignId, ids };
   });
-  return run();
+  const recorded = run();
+  if (!credentials) {
+    return {
+      campaignId: recorded.campaignId,
+      recipientCount: recipients.length,
+      sentCount: 0,
+      failedCount: 0,
+      linkUrl: input.linkUrl,
+      mode: "logged" as const,
+    };
+  }
+
+  let sentCount = 0;
+  let failedCount = 0;
+  const mark = db.prepare("UPDATE sms_log SET status = ?, detail = ? WHERE id = ?");
+  for (const recipient of recorded.ids) {
+    const result = await sendTextMessage(credentials, recipient.phone, body);
+    if (result.ok) sentCount += 1;
+    else failedCount += 1;
+    mark.run(result.ok ? "sent" : "failed", result.detail, recipient.id);
+  }
+  return {
+    campaignId: recorded.campaignId,
+    recipientCount: recipients.length,
+    sentCount,
+    failedCount,
+    linkUrl: input.linkUrl,
+    mode: "sent" as const,
+  };
 }
 
 export function listCampaigns(businessId: number): Campaign[] {
+  textSettings(businessId);
   const db = getDb();
   const campaigns = db
     .prepare(
@@ -94,7 +124,7 @@ export function listCampaigns(businessId: number): Campaign[] {
   })[];
   const deliveries = db.prepare(
     `SELECT id, recipient_name AS recipientName, recipient_kind AS recipientKind,
-            phone, body, status, created_at AS createdAt
+            phone, body, status, detail, created_at AS createdAt
      FROM sms_log WHERE campaign_id = ? ORDER BY id`,
   );
   return campaigns.map((campaign) => ({

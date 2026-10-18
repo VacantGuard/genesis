@@ -12,7 +12,7 @@ The staff terminal (`/terminal`) is a separate login-gated desk for that busines
 
 The homepage (`/`) and `/b/{slug}` show the same business.
 
-Payment is the practice card checkout. Texting writes the local text log. No card is charged, and no SMS leaves the machine. There is no delivery or driver workflow.
+Payment is the practice card checkout. No card is charged. Texts leave the machine only after a text platform is saved on the Texts page. There is no delivery or driver workflow.
 
 ## Run it
 
@@ -50,15 +50,15 @@ Use a future expiry (`12/28`) and any 3-digit CVC. Only the last four digits are
 
 ## Text campaigns
 
-The terminal logs each outbound text locally and prints a line to the server console (`[local-sms]`). It does not call Twilio or any other SMS provider. Each campaign stores that business’s public menu link (`/b/{slug}#pos`).
+On Terminal → Texts, choose Sendblue, Twilio, or SimpleTexting and save that platform’s key and sending number. A campaign then sends that message to the selected customers and company contacts, and stores each delivery. Until a platform is saved, a campaign is only written to the local log. Each message includes that business’s public menu link (`/b/{slug}#pos`). The sample 555 numbers are not real phones.
 
-The Slack agent in `prep-desk` uses this same log. It does not send a second kind of text.
+The Slack agent in `prep-desk` uses this same send path.
 
 ## Slack agent
 
 `prep-desk` is the product agent. It is not tied to one kitchen. On a mention or direct message it reads the Slack workspace id and opens the business that has that id saved under Terminal → Slack. If the id is not saved, it replies with the workspace id and does not change a menu.
 
-From Slack, staff can ask it to read the weekly menu, change or remove a meal, or text that business’s clients. A real menu change logs a text to that business’s customers and company contacts, including the public menu link.
+From Slack, staff can ask it to read the weekly menu, change or remove a meal, or text that business’s clients. Texting uses the platform saved on that business. A menu edit notifies n8n; it does not text clients unless someone sends a campaign.
 
 Tokens are created with the BDK Slack wizard and stored in `prep-desk/.env.local` as `PREP_DESK_SLACK_BOT_TOKEN` and `PREP_DESK_SLACK_APP_TOKEN`. Do not put them in `.env`.
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
 import { saveAgentWebhook } from "@/lib/agent";
+import { saveTextSettings } from "@/lib/messaging";
 import { setSlackConnection } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
 
@@ -29,6 +30,27 @@ export async function saveAgentWebhookAction(formData: FormData) {
     ? "n8n will receive a trigger each time the menu changes."
     : "Menu updates will stay on this desk until an n8n webhook is saved.";
   redirect(`/terminal/agent?saved=${encodeURIComponent(message)}`);
+}
+
+export async function saveTextPlatformAction(formData: FormData) {
+  const business = await currentBusiness();
+  await requireSession();
+  const platform = field(formData, "platform");
+  try {
+    saveTextSettings(business.id, {
+      platform,
+      accountId: field(formData, "accountId"),
+      secret: field(formData, "secret"),
+      fromNumber: field(formData, "fromNumber"),
+    });
+  } catch (error) {
+    bounce("/terminal/campaigns", error instanceof Error ? error.message : "Could not save the text platform.");
+  }
+  revalidatePath("/terminal/campaigns");
+  const message = platform
+    ? "Text platform saved. Campaigns send through that account."
+    : "Text platform disconnected. Campaigns stay in the log until you connect one again.";
+  redirect(`/terminal/campaigns?saved=${encodeURIComponent(message)}`);
 }
 
 export async function saveSlackAction(formData: FormData) {

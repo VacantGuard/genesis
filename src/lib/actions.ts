@@ -268,7 +268,10 @@ export async function sendCampaignAction(input: {
   message: string;
   includeCustomers: boolean;
   includeCompanyContacts: boolean;
-}): Promise<{ ok: true; recipientCount: number; linkUrl: string } | { ok: false; error: string }> {
+}): Promise<
+  | { ok: true; recipientCount: number; sentCount: number; failedCount: number; linkUrl: string; mode: "sent" | "logged" }
+  | { ok: false; error: string }
+> {
   const business = await deskBusiness();
   const message = input.message.trim();
   if (message.length < 2 || message.length > 480) {
@@ -284,7 +287,7 @@ export async function sendCampaignAction(input: {
   const linkUrl = menuLink(business.slug, `${proto}://${host}`);
 
   try {
-    const result = sendCampaign({
+    const result = await sendCampaign({
       businessId: business.id,
       message,
       linkUrl,
@@ -292,7 +295,14 @@ export async function sendCampaignAction(input: {
       includeCompanyContacts: input.includeCompanyContacts,
     });
     revalidatePath("/terminal/campaigns");
-    return { ok: true, recipientCount: result.recipientCount, linkUrl: result.linkUrl };
+    return {
+      ok: true,
+      recipientCount: result.recipientCount,
+      sentCount: result.sentCount,
+      failedCount: result.failedCount,
+      linkUrl: result.linkUrl,
+      mode: result.mode,
+    };
   } catch (error) {
     if (error instanceof OrderError) return { ok: false, error: error.message };
     throw error;
