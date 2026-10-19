@@ -11,7 +11,8 @@ export default function OrdersPage() {
         <div>
           <h1 className="font-heading text-3xl tracking-tight">Paid orders</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Meal orders recorded by the practice checkout. Export a CSV for the kitchen.
+            Delivered meal orders from practice checkout. Each ticket has a drop address. Export a
+            CSV for the kitchen.
           </p>
         </div>
         <a href="/terminal/orders/export" className={buttonVariants({ variant: "outline" })}>
@@ -35,6 +36,26 @@ export default function OrdersPage() {
                 {order.customerName}
                 {order.companyName ? ` · ${order.companyName}` : ""} · {order.phone} · {order.email}
               </p>
+              {order.deliveryAddress ? (
+                <p className="text-sm">
+                  Deliver to {order.deliveryAddress}
+                  {order.deliveryLocateUrl ? (
+                    <>
+                      {" · "}
+                      <a
+                        href={order.deliveryLocateUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary underline-offset-2 hover:underline"
+                      >
+                        Locate
+                      </a>
+                    </>
+                  ) : null}
+                </p>
+              ) : (
+                <p className="text-sm text-amber-700">No delivery address on this order.</p>
+              )}
               <p className="text-sm text-muted-foreground">Card ending {order.cardLast4}</p>
               {order.notes ? <p className="text-sm">Notes: {order.notes}</p> : null}
               <ul className="grid gap-1 text-sm">

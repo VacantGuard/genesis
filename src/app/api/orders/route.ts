@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { OrderError, placeOrder } from "@/lib/db";
+import { readDeliveryAddress, validateDeliveryAddress } from "@/lib/delivery";
 import { validateMockCard } from "@/lib/payment";
 
 export const runtime = "nodejs";
@@ -11,6 +12,13 @@ type Body = {
   email?: string;
   companyName?: string;
   notes?: string;
+  delivery?: {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+  };
   card?: { number?: string; expiry?: string; cvc?: string; name?: string };
   lines?: { menuItemId?: number; quantity?: number }[];
 };
@@ -43,6 +51,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter an email for the receipt." }, { status: 400 });
   }
 
+  const delivery = readDeliveryAddress(body.delivery ?? {});
+  const deliveryError = validateDeliveryAddress(delivery);
+  if (deliveryError) {
+    return NextResponse.json({ error: deliveryError }, { status: 400 });
+  }
+
   const lines = Array.isArray(body.lines) ? body.lines : [];
   const merged = new Map<number, number>();
   for (const line of lines) {
@@ -73,6 +87,7 @@ export async function POST(request: Request) {
       companyName,
       notes,
       cardLast4: card.last4,
+      delivery,
       lines: [...merged.entries()].map(([menuItemId, quantity]) => ({ menuItemId, quantity })),
     });
     return NextResponse.json(order);

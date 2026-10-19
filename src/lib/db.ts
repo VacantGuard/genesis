@@ -13,6 +13,11 @@ import type {
   PublicCategory,
   SmsDelivery,
 } from "@/lib/types";
+import {
+  deliveryLocateUrl,
+  formatDeliveryAddress,
+  type DeliveryAddress,
+} from "@/lib/delivery";
 
 export class OrderError extends Error {}
 
@@ -28,6 +33,7 @@ export type NewOrderInput = {
   companyName: string;
   notes: string;
   cardLast4: string;
+  delivery: DeliveryAddress;
   lines: OrderLineInput[];
 };
 
@@ -41,6 +47,12 @@ const globalForDb = globalThis as unknown as { kitchenDb?: Database.Database };
 
 function databasePath() {
   return process.env.DATABASE_PATH || path.join(process.cwd(), "data", "kitchen.sqlite");
+}
+
+function ensureColumn(db: Database.Database, table: string, column: string, ddl: string) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (cols.some((col) => col.name === column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
 }
 
 function migrate(db: Database.Database) {
@@ -85,6 +97,11 @@ function migrate(db: Database.Database) {
       email TEXT NOT NULL DEFAULT '',
       company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
       notes TEXT NOT NULL DEFAULT '',
+      delivery_line1 TEXT NOT NULL DEFAULT '',
+      delivery_line2 TEXT NOT NULL DEFAULT '',
+      delivery_city TEXT NOT NULL DEFAULT '',
+      delivery_state TEXT NOT NULL DEFAULT '',
+      delivery_postal_code TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL
     );
 
@@ -99,6 +116,11 @@ function migrate(db: Database.Database) {
       card_last4 TEXT NOT NULL,
       total_cents INTEGER NOT NULL,
       status TEXT NOT NULL DEFAULT 'paid',
+      delivery_line1 TEXT NOT NULL DEFAULT '',
+      delivery_line2 TEXT NOT NULL DEFAULT '',
+      delivery_city TEXT NOT NULL DEFAULT '',
+      delivery_state TEXT NOT NULL DEFAULT '',
+      delivery_postal_code TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL
     );
 
@@ -131,14 +153,50 @@ function migrate(db: Database.Database) {
       created_at TEXT NOT NULL
     );
   `);
+
+  ensureColumn(db, "customers", "delivery_line1", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "customers", "delivery_line2", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "customers", "delivery_city", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "customers", "delivery_state", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "customers", "delivery_postal_code", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "orders", "delivery_line1", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "orders", "delivery_line2", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "orders", "delivery_city", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "orders", "delivery_state", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "orders", "delivery_postal_code", "TEXT NOT NULL DEFAULT ''");
 }
 
 const SAMPLE_NAME = "Hearth Prep";
 const SAMPLE_ABOUT = [
   "Hearth Prep is sample copy for a meal prep kitchen. Rewrite it from the staff terminal when this business is real.",
-  "Each week the kitchen cooks a short menu of portioned meals: breakfasts, mains, and sides you can heat through the week. Order and pay on this page. Meals are packed for pickup at the kitchen.",
-  "Sample prep day is Sunday, with pickup Monday to Wednesday. Change the name, this story, and the weekly menu whenever the cook cycle changes. Delivery routing is not part of this desk.",
+  "Each week the kitchen cooks a short menu of portioned meals: breakfasts, mains, and sides you can heat through the week. Order and pay on this page. Every meal order is delivered to the address on the ticket.",
+  "Sample prep day is Sunday, with deliveries Monday to Wednesday. Change the name, this story, and the weekly menu whenever the cook cycle changes. Driver routing software is not part of this desk yet — addresses live on each client and paid order so staff and the agent can locate the drop.",
 ].join("\n\n");
+
+function withDeliveryFields(row: {
+  deliveryLine1?: string;
+  deliveryLine2?: string;
+  deliveryCity?: string;
+  deliveryState?: string;
+  deliveryPostalCode?: string;
+}) {
+  const delivery: DeliveryAddress = {
+    line1: row.deliveryLine1 ?? "",
+    line2: row.deliveryLine2 ?? "",
+    city: row.deliveryCity ?? "",
+    state: row.deliveryState ?? "",
+    postalCode: row.deliveryPostalCode ?? "",
+  };
+  return {
+    deliveryLine1: delivery.line1,
+    deliveryLine2: delivery.line2,
+    deliveryCity: delivery.city,
+    deliveryState: delivery.state,
+    deliveryPostalCode: delivery.postalCode,
+    deliveryAddress: formatDeliveryAddress(delivery),
+    deliveryLocateUrl: deliveryLocateUrl(delivery),
+  };
+}
 
 function insertSampleMenu(db: Database.Database) {
   const category = db.prepare(
@@ -227,8 +285,10 @@ function seed(db: Database.Database) {
     );
 
     const customer = db.prepare(
-      `INSERT INTO customers (name, phone, email, company_id, notes, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO customers
+        (name, phone, email, company_id, notes,
+         delivery_line1, delivery_line2, delivery_city, delivery_state, delivery_postal_code, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     customer.run(
       "Avery Cole",
@@ -236,6 +296,11 @@ function seed(db: Database.Database) {
       "avery.cole@example.com",
       companyId,
       "Sample customer who orders prep for the studio.",
+      "410 N Wells St",
+      "Suite 400",
+      "Chicago",
+      "IL",
+      "60654",
       now,
     );
     customer.run(
@@ -244,6 +309,11 @@ function seed(db: Database.Database) {
       "morgan.ellis@example.com",
       null,
       "Sample customer. No onions.",
+      "233 S Wacker Dr",
+      "Apt 12B",
+      "Chicago",
+      "IL",
+      "60606",
       now,
     );
     customer.run(
@@ -252,6 +322,11 @@ function seed(db: Database.Database) {
       "quinn.park@example.com",
       null,
       "Sample customer record.",
+      "1410 N Milwaukee Ave",
+      "",
+      "Chicago",
+      "IL",
+      "60622",
       now,
     );
   });
@@ -272,6 +347,7 @@ export function getDb() {
     globalForDb.kitchenDb = db;
   }
   reframeLegacyLunchSample(globalForDb.kitchenDb);
+  backfillSampleDeliveryAddresses(globalForDb.kitchenDb);
   return globalForDb.kitchenDb;
 }
 
@@ -320,6 +396,56 @@ function reframeLegacyLunchSample(db: Database.Database) {
     ).run("Sample customer record.");
   });
   apply();
+}
+
+function backfillSampleDeliveryAddresses(db: Database.Database) {
+  const samples: { name: string; delivery: DeliveryAddress }[] = [
+    {
+      name: "Avery Cole",
+      delivery: {
+        line1: "410 N Wells St",
+        line2: "Suite 400",
+        city: "Chicago",
+        state: "IL",
+        postalCode: "60654",
+      },
+    },
+    {
+      name: "Morgan Ellis",
+      delivery: {
+        line1: "233 S Wacker Dr",
+        line2: "Apt 12B",
+        city: "Chicago",
+        state: "IL",
+        postalCode: "60606",
+      },
+    },
+    {
+      name: "Quinn Park",
+      delivery: {
+        line1: "1410 N Milwaukee Ave",
+        line2: "",
+        city: "Chicago",
+        state: "IL",
+        postalCode: "60622",
+      },
+    },
+  ];
+  const update = db.prepare(
+    `UPDATE customers
+     SET delivery_line1 = ?, delivery_line2 = ?, delivery_city = ?, delivery_state = ?, delivery_postal_code = ?
+     WHERE name = ? AND TRIM(delivery_line1) = ''`,
+  );
+  for (const sample of samples) {
+    update.run(
+      sample.delivery.line1,
+      sample.delivery.line2,
+      sample.delivery.city,
+      sample.delivery.state,
+      sample.delivery.postalCode,
+      sample.name,
+    );
+  }
 }
 
 export function getProfile(): BusinessProfile {
@@ -520,41 +646,61 @@ export function deleteCompany(id: number) {
   getDb().prepare("DELETE FROM companies WHERE id = ?").run(id);
 }
 
-export function listCustomers(): Customer[] {
-  return getDb()
-    .prepare(
-      `SELECT
+const CUSTOMER_SELECT = `SELECT
          cu.id,
          cu.name,
          cu.phone,
          cu.email,
          cu.company_id AS companyId,
          COALESCE(co.name, '') AS companyName,
-         cu.notes
+         cu.notes,
+         cu.delivery_line1 AS deliveryLine1,
+         cu.delivery_line2 AS deliveryLine2,
+         cu.delivery_city AS deliveryCity,
+         cu.delivery_state AS deliveryState,
+         cu.delivery_postal_code AS deliveryPostalCode
        FROM customers cu
-       LEFT JOIN companies co ON co.id = cu.company_id
-       ORDER BY cu.name COLLATE NOCASE`,
-    )
-    .all() as Customer[];
+       LEFT JOIN companies co ON co.id = cu.company_id`;
+
+function mapCustomer(row: {
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+  companyId: number | null;
+  companyName: string;
+  notes: string;
+  deliveryLine1: string;
+  deliveryLine2: string;
+  deliveryCity: string;
+  deliveryState: string;
+  deliveryPostalCode: string;
+}): Customer {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    email: row.email,
+    companyId: row.companyId,
+    companyName: row.companyName,
+    notes: row.notes,
+    ...withDeliveryFields(row),
+  };
+}
+
+export function listCustomers(): Customer[] {
+  return (
+    getDb()
+      .prepare(`${CUSTOMER_SELECT} ORDER BY cu.name COLLATE NOCASE`)
+      .all() as Omit<Customer, "deliveryAddress" | "deliveryLocateUrl">[]
+  ).map(mapCustomer);
 }
 
 export function getCustomer(id: number): Customer | null {
   const row = getDb()
-    .prepare(
-      `SELECT
-         cu.id,
-         cu.name,
-         cu.phone,
-         cu.email,
-         cu.company_id AS companyId,
-         COALESCE(co.name, '') AS companyName,
-         cu.notes
-       FROM customers cu
-       LEFT JOIN companies co ON co.id = cu.company_id
-       WHERE cu.id = ?`,
-    )
-    .get(id) as Customer | undefined;
-  return row ?? null;
+    .prepare(`${CUSTOMER_SELECT} WHERE cu.id = ?`)
+    .get(id) as Omit<Customer, "deliveryAddress" | "deliveryLocateUrl"> | undefined;
+  return row ? mapCustomer(row) : null;
 }
 
 export function saveCustomer(input: {
@@ -564,25 +710,106 @@ export function saveCustomer(input: {
   email: string;
   companyId: number | null;
   notes: string;
+  delivery: DeliveryAddress;
 }) {
   const db = getDb();
   if (input.id) {
     db.prepare(
       `UPDATE customers
-       SET name = ?, phone = ?, email = ?, company_id = ?, notes = ?
+       SET name = ?, phone = ?, email = ?, company_id = ?, notes = ?,
+           delivery_line1 = ?, delivery_line2 = ?, delivery_city = ?,
+           delivery_state = ?, delivery_postal_code = ?
        WHERE id = ?`,
-    ).run(input.name, input.phone, input.email, input.companyId, input.notes, input.id);
+    ).run(
+      input.name,
+      input.phone,
+      input.email,
+      input.companyId,
+      input.notes,
+      input.delivery.line1,
+      input.delivery.line2,
+      input.delivery.city,
+      input.delivery.state,
+      input.delivery.postalCode,
+      input.id,
+    );
     return;
   }
   db.prepare(
-    `INSERT INTO customers (name, phone, email, company_id, notes, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO customers
+      (name, phone, email, company_id, notes,
+       delivery_line1, delivery_line2, delivery_city, delivery_state, delivery_postal_code, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     input.name,
     input.phone,
     input.email,
     input.companyId,
     input.notes,
+    input.delivery.line1,
+    input.delivery.line2,
+    input.delivery.city,
+    input.delivery.state,
+    input.delivery.postalCode,
+    new Date().toISOString(),
+  );
+}
+
+function upsertCustomerDeliveryFromOrder(input: {
+  customerName: string;
+  phone: string;
+  email: string;
+  companyName: string;
+  delivery: DeliveryAddress;
+}) {
+  const db = getDb();
+  const digits = normalizePhone(input.phone);
+  if (digits.length < 7) return;
+
+  const existing = listCustomers().find((customer) => normalizePhone(customer.phone) === digits);
+  if (existing) {
+    db.prepare(
+      `UPDATE customers
+       SET name = ?, email = COALESCE(NULLIF(?, ''), email),
+           delivery_line1 = ?, delivery_line2 = ?, delivery_city = ?,
+           delivery_state = ?, delivery_postal_code = ?
+       WHERE id = ?`,
+    ).run(
+      input.customerName,
+      input.email,
+      input.delivery.line1,
+      input.delivery.line2,
+      input.delivery.city,
+      input.delivery.state,
+      input.delivery.postalCode,
+      existing.id,
+    );
+    return;
+  }
+
+  let companyId: number | null = null;
+  if (input.companyName) {
+    const company = listCompanies().find(
+      (row) => row.name.toLowerCase() === input.companyName.toLowerCase(),
+    );
+    companyId = company?.id ?? null;
+  }
+
+  db.prepare(
+    `INSERT INTO customers
+      (name, phone, email, company_id, notes,
+       delivery_line1, delivery_line2, delivery_city, delivery_state, delivery_postal_code, created_at)
+     VALUES (?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    input.customerName,
+    input.phone,
+    input.email,
+    companyId,
+    input.delivery.line1,
+    input.delivery.line2,
+    input.delivery.city,
+    input.delivery.state,
+    input.delivery.postalCode,
     new Date().toISOString(),
   );
 }
@@ -634,8 +861,9 @@ export function placeOrder(input: NewOrderInput) {
     const inserted = db
       .prepare(
         `INSERT INTO orders
-          (order_number, customer_name, phone, email, company_name, notes, card_last4, total_cents, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?)`,
+          (order_number, customer_name, phone, email, company_name, notes, card_last4, total_cents, status,
+           delivery_line1, delivery_line2, delivery_city, delivery_state, delivery_postal_code, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         orderNumber,
@@ -646,6 +874,11 @@ export function placeOrder(input: NewOrderInput) {
         input.notes,
         input.cardLast4,
         totalCents,
+        input.delivery.line1,
+        input.delivery.line2,
+        input.delivery.city,
+        input.delivery.state,
+        input.delivery.postalCode,
         createdAt,
       );
     const orderId = Number(inserted.lastInsertRowid);
@@ -656,10 +889,19 @@ export function placeOrder(input: NewOrderInput) {
     for (const line of priced) {
       insertItem.run(orderId, line.name, line.quantity, line.unitPriceCents);
     }
+    upsertCustomerDeliveryFromOrder({
+      customerName: input.customerName,
+      phone: input.phone,
+      email: input.email,
+      companyName: input.companyName,
+      delivery: input.delivery,
+    });
     return {
       orderNumber,
       totalCents,
       customerName: input.customerName,
+      deliveryAddress: formatDeliveryAddress(input.delivery),
+      deliveryLocateUrl: deliveryLocateUrl(input.delivery),
       items: priced,
     };
   });
@@ -680,17 +922,29 @@ export function listOrders(): KitchenOrder[] {
          notes,
          card_last4 AS cardLast4,
          total_cents AS totalCents,
-         created_at AS createdAt
+         created_at AS createdAt,
+         delivery_line1 AS deliveryLine1,
+         delivery_line2 AS deliveryLine2,
+         delivery_city AS deliveryCity,
+         delivery_state AS deliveryState,
+         delivery_postal_code AS deliveryPostalCode
        FROM orders
        ORDER BY id DESC`,
     )
-    .all() as Omit<KitchenOrder, "items">[];
+    .all() as (Omit<KitchenOrder, "items" | "deliveryAddress" | "deliveryLocateUrl"> & {
+      deliveryLine1: string;
+      deliveryLine2: string;
+      deliveryCity: string;
+      deliveryState: string;
+      deliveryPostalCode: string;
+    })[];
   const itemStmt = db.prepare(
     `SELECT item_name AS name, quantity, unit_price_cents AS unitPriceCents
      FROM order_items WHERE order_id = ? ORDER BY id`,
   );
   return orders.map((order) => ({
     ...order,
+    ...withDeliveryFields(order),
     items: itemStmt.all(order.id) as KitchenOrder["items"],
   }));
 }
@@ -704,6 +958,11 @@ export function orderExportRows() {
          o.company_name AS companyName,
          o.phone,
          o.email,
+         o.delivery_line1 AS deliveryLine1,
+         o.delivery_line2 AS deliveryLine2,
+         o.delivery_city AS deliveryCity,
+         o.delivery_state AS deliveryState,
+         o.delivery_postal_code AS deliveryPostalCode,
          oi.item_name AS item,
          oi.quantity,
          oi.unit_price_cents AS unitPriceCents,
@@ -713,18 +972,63 @@ export function orderExportRows() {
        JOIN order_items oi ON oi.order_id = o.id
        ORDER BY o.id DESC, oi.id ASC`,
     )
-    .all() as {
-    orderNumber: string;
-    customerName: string;
-    companyName: string;
-    phone: string;
-    email: string;
-    item: string;
-    quantity: number;
-    unitPriceCents: number;
-    notes: string;
-    placedAt: string;
-  }[];
+    .all()
+    .map((row) => {
+      const order = row as {
+        orderNumber: string;
+        customerName: string;
+        companyName: string;
+        phone: string;
+        email: string;
+        deliveryLine1: string;
+        deliveryLine2: string;
+        deliveryCity: string;
+        deliveryState: string;
+        deliveryPostalCode: string;
+        item: string;
+        quantity: number;
+        unitPriceCents: number;
+        notes: string;
+        placedAt: string;
+      };
+      const delivery = withDeliveryFields(order);
+      return {
+        orderNumber: order.orderNumber,
+        customerName: order.customerName,
+        companyName: order.companyName,
+        phone: order.phone,
+        email: order.email,
+        deliveryAddress: delivery.deliveryAddress,
+        deliveryLocateUrl: delivery.deliveryLocateUrl,
+        item: order.item,
+        quantity: order.quantity,
+        unitPriceCents: order.unitPriceCents,
+        notes: order.notes,
+        placedAt: order.placedAt,
+      };
+    });
+}
+
+/** Shape the Slack / n8n agent uses to find a client's drop. */
+export function listClientsForAgent() {
+  return listCustomers().map((customer) => ({
+    id: customer.id,
+    name: customer.name,
+    phone: customer.phone,
+    email: customer.email,
+    companyName: customer.companyName,
+    notes: customer.notes,
+    delivery: {
+      line1: customer.deliveryLine1,
+      line2: customer.deliveryLine2,
+      city: customer.deliveryCity,
+      state: customer.deliveryState,
+      postalCode: customer.deliveryPostalCode,
+      formatted: customer.deliveryAddress,
+      mapsQuery: customer.deliveryAddress,
+      locateUrl: customer.deliveryLocateUrl,
+    },
+  }));
 }
 
 function normalizePhone(phone: string) {

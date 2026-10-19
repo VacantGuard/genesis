@@ -13,6 +13,8 @@ type Confirmation = {
   orderNumber: string;
   totalCents: number;
   customerName: string;
+  deliveryAddress?: string;
+  deliveryLocateUrl?: string;
   items: { name: string; quantity: number; unitPriceCents: number }[];
   last4: string;
 };
@@ -29,6 +31,11 @@ export function PublicSite({
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [deliveryLine1, setDeliveryLine1] = useState("");
+  const [deliveryLine2, setDeliveryLine2] = useState("");
+  const [deliveryCity, setDeliveryCity] = useState("");
+  const [deliveryState, setDeliveryState] = useState("");
+  const [deliveryPostalCode, setDeliveryPostalCode] = useState("");
   const [notes, setNotes] = useState("");
   const [cardName, setCardName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -87,6 +94,13 @@ export function PublicSite({
           email,
           companyName,
           notes,
+          delivery: {
+            line1: deliveryLine1,
+            line2: deliveryLine2,
+            city: deliveryCity,
+            state: deliveryState,
+            postalCode: deliveryPostalCode,
+          },
           card: { name: cardName, number: cardNumber, expiry, cvc },
           lines: lines.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity })),
         }),
@@ -141,7 +155,7 @@ export function PublicSite({
             {profile.name}
           </h1>
           <p className="mt-5 max-w-xl text-lg text-muted-foreground">
-            Portioned meals for the week. Order and pay on this page, then pick them up at the kitchen.
+            Portioned meals for the week. Order and pay on this page — every meal is delivered to your address.
           </p>
         </section>
 
@@ -209,8 +223,8 @@ export function PublicSite({
               <p className="text-xs font-medium tracking-[0.18em] text-background/70 uppercase">POS</p>
               <h2 className="font-heading mt-2 text-3xl font-medium tracking-tight">Pay and order</h2>
               <p className="mt-3 max-w-md text-sm text-background/75">
-                Order this week’s meals. Practice checkout: the card is checked here and the order
-                is marked paid. No charge is sent to a bank.
+                Order this week’s meals for delivery. Practice checkout: the card is checked here and
+                the order is marked paid. No charge is sent to a bank.
               </p>
               <div className="mt-6 grid gap-3">
                 {lines.length === 0 ? (
@@ -261,9 +275,22 @@ export function PublicSite({
                 <p className="text-xs font-medium tracking-[0.18em] text-primary uppercase">Paid</p>
                 <h3 className="font-heading mt-2 text-4xl tracking-tight">{confirmation.orderNumber}</h3>
                 <p className="mt-3 text-sm text-muted-foreground">
-                  {confirmation.customerName}, your meal order is paid. Card ending {confirmation.last4}.
-                  This was a practice payment.
+                  {confirmation.customerName}, your meal order is paid and queued for delivery
+                  {confirmation.deliveryAddress ? ` to ${confirmation.deliveryAddress}` : ""}. Card
+                  ending {confirmation.last4}. This was a practice payment.
                 </p>
+                {confirmation.deliveryLocateUrl ? (
+                  <p className="mt-2 text-sm">
+                    <a
+                      href={confirmation.deliveryLocateUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline-offset-2 hover:underline"
+                    >
+                      Open delivery location on map
+                    </a>
+                  </p>
+                ) : null}
                 <ul className="mt-4 grid gap-1 text-sm">
                   {confirmation.items.map((item) => (
                     <li key={item.name} className="flex justify-between gap-3">
@@ -324,6 +351,56 @@ export function PublicSite({
                       value={companyName}
                       onChange={(event) => setCompanyName(event.target.value)}
                       placeholder="Optional"
+                      className="h-10 bg-card"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm sm:col-span-2">
+                    <span className="font-medium">Delivery street</span>
+                    <Input
+                      value={deliveryLine1}
+                      onChange={(event) => setDeliveryLine1(event.target.value)}
+                      required
+                      autoComplete="address-line1"
+                      className="h-10 bg-card"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm sm:col-span-2">
+                    <span className="font-medium">Apt / suite</span>
+                    <Input
+                      value={deliveryLine2}
+                      onChange={(event) => setDeliveryLine2(event.target.value)}
+                      autoComplete="address-line2"
+                      placeholder="Optional"
+                      className="h-10 bg-card"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm">
+                    <span className="font-medium">City</span>
+                    <Input
+                      value={deliveryCity}
+                      onChange={(event) => setDeliveryCity(event.target.value)}
+                      required
+                      autoComplete="address-level2"
+                      className="h-10 bg-card"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm">
+                    <span className="font-medium">State</span>
+                    <Input
+                      value={deliveryState}
+                      onChange={(event) => setDeliveryState(event.target.value)}
+                      required
+                      autoComplete="address-level1"
+                      className="h-10 bg-card"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm sm:col-span-2">
+                    <span className="font-medium">ZIP</span>
+                    <Input
+                      value={deliveryPostalCode}
+                      onChange={(event) => setDeliveryPostalCode(event.target.value)}
+                      required
+                      autoComplete="postal-code"
                       className="h-10 bg-card"
                     />
                   </label>

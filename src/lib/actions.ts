@@ -206,6 +206,13 @@ function readCustomer(formData: FormData) {
   const notes = field(formData, "notes");
   const companyRaw = field(formData, "companyId");
   const companyId = companyRaw ? optionalId(companyRaw) ?? null : null;
+  const delivery = {
+    line1: field(formData, "deliveryLine1"),
+    line2: field(formData, "deliveryLine2"),
+    city: field(formData, "deliveryCity"),
+    state: field(formData, "deliveryState").toUpperCase(),
+    postalCode: field(formData, "deliveryPostalCode"),
+  };
   if (companyRaw && !companyId) {
     bounce("/terminal/customers", "Choose a valid company.");
   }
@@ -218,7 +225,19 @@ function readCustomer(formData: FormData) {
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     bounce("/terminal/customers", "That email does not look right.");
   }
-  return { name, phone, email, companyId, notes };
+  if (!delivery.line1 || delivery.line1.length < 3) {
+    bounce("/terminal/customers", "Enter a delivery street address.");
+  }
+  if (!delivery.city || delivery.city.length < 2) {
+    bounce("/terminal/customers", "Enter the delivery city.");
+  }
+  if (!delivery.state || delivery.state.length < 2) {
+    bounce("/terminal/customers", "Enter the delivery state.");
+  }
+  if (!delivery.postalCode || delivery.postalCode.length < 3) {
+    bounce("/terminal/customers", "Enter the delivery ZIP or postal code.");
+  }
+  return { name, phone, email, companyId, notes, delivery };
 }
 
 export async function saveCustomerAction(formData: FormData) {

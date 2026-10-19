@@ -6,11 +6,11 @@ The public page (`/`) has three sections:
 
 - **Menu** — this week’s meal categories, names, descriptions, prices, and availability
 - **About** — copy from the editable business profile
-- **POS** — cart, customer details, and a practice card payment that records a paid order
+- **POS** — cart, customer details, delivery address, and a practice card payment that records a paid order for delivery
 
-The staff terminal (`/terminal`) is a separate login-gated desk for the weekly menu, customers, companies, text campaigns, paid orders, and the business profile.
+The staff terminal (`/terminal`) is a separate login-gated desk for the weekly menu, customers (with delivery addresses), companies, text campaigns, paid orders, and the business profile.
 
-Payment and texting are local mocks. No card is charged, and no SMS leaves the machine. There is no delivery or driver workflow.
+Payment and texting are local mocks. No card is charged, and no SMS leaves the machine. Every meal order is delivered; driver routing software is not included yet. The agent can read client drops at `GET /api/agent/clients` (optional `?q=` filter), including a Google Maps `locateUrl` for each address.
 
 ## Run it
 
@@ -40,7 +40,7 @@ Override them with `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `SESSION_SECRET` if y
 
 ## Practice checkout
 
-On the public POS section, use any name and a card number that passes a basic check. This test number works:
+On the public POS section, enter a delivery address (street, city, state, ZIP), any name, and a card number that passes a basic check. This test number works:
 
 `4242 4242 4242 4242`
 

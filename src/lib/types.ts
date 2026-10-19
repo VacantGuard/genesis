@@ -49,6 +49,15 @@ export type Customer = {
   companyId: number | null;
   companyName: string;
   notes: string;
+  deliveryLine1: string;
+  deliveryLine2: string;
+  deliveryCity: string;
+  deliveryState: string;
+  deliveryPostalCode: string;
+  /** Single-line address for humans and the agent. Empty if incomplete. */
+  deliveryAddress: string;
+  /** Google Maps search URL for this drop. Empty if incomplete. */
+  deliveryLocateUrl: string;
 };
 
 export type OrderItem = {
@@ -68,6 +77,13 @@ export type KitchenOrder = {
   cardLast4: string;
   totalCents: number;
   createdAt: string;
+  deliveryLine1: string;
+  deliveryLine2: string;
+  deliveryCity: string;
+  deliveryState: string;
+  deliveryPostalCode: string;
+  deliveryAddress: string;
+  deliveryLocateUrl: string;
   items: OrderItem[];
 };
 
