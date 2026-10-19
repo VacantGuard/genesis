@@ -27,7 +27,16 @@ The dev server binds to `0.0.0.0:43123`.
 
 Open [http://127.0.0.1:43123](http://127.0.0.1:43123) for the public menu, and [http://127.0.0.1:43123/terminal](http://127.0.0.1:43123/terminal) for the staff terminal.
 
-The database file is `data/kitchen.sqlite`. It is created on first launch and kept across restarts. It is not committed.
+Customer accounts, orders, and the client list live in Turso when both of these are set in `.env.local`:
+
+```bash
+TURSO_DATABASE_URL=libsql://your-database-your-org.turso.io
+TURSO_AUTH_TOKEN=your-token
+```
+
+The database URL from the Turso dashboard may start with `https://`. Either form works. Do not commit `.env.local`.
+
+On the first launch with those values, the app creates the tables in Turso and copies the existing local file (`data/kitchen.sqlite`) if Turso is still empty. After that, Turso is the database the site reads and writes. Without those two values, the app keeps using `data/kitchen.sqlite`.
 
 ## Seeded staff login
 

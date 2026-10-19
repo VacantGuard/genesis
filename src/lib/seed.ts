@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type Database from "libsql";
 
 export const SAMPLE_NAME = "North Bowl";
 const SAMPLE_ABOUT = [

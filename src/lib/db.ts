@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
+import Database from "libsql";
 import { initTenancy, keepSampleAsNorthBowl } from "./businesses.ts";
 import { reframeLegacyLunchSample, seed } from "./seed.ts";
+
 export class OrderError extends Error {}
 
 export type OrderLineInput = {
@@ -24,10 +25,146 @@ export type NewOrderInput = {
 const globalForDb = globalThis as unknown as {
   kitchenDb?: Database.Database;
   tenancyReady?: boolean;
+  envLoaded?: boolean;
 };
+
+let opening = false;
+
+function loadLocalEnv() {
+  if (globalForDb.envLoaded) return;
+  globalForDb.envLoaded = true;
+  const candidates = [
+    path.join(process.cwd(), ".env.local"),
+    path.join(process.cwd(), "..", ".env.local"),
+  ];
+  for (const file of candidates) {
+    if (!fs.existsSync(file)) continue;
+    for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq <= 0) continue;
+      const key = trimmed.slice(0, eq).trim();
+      if (!/^TURSO_[A-Z0-9_]+$/.test(key)) continue;
+      if (process.env[key]) continue;
+      let value = trimmed.slice(eq + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      process.env[key] = value;
+    }
+  }
+}
 
 function databasePath() {
   return process.env.DATABASE_PATH || path.join(process.cwd(), "data", "kitchen.sqlite");
+}
+
+export function tursoConfig() {
+  loadLocalEnv();
+  const token = process.env.TURSO_AUTH_TOKEN?.trim();
+  const raw = process.env.TURSO_DATABASE_URL?.trim();
+  if (!token || !raw) return null;
+  const url = raw.startsWith("https://") ? `libsql://${raw.slice("https://".length)}` : raw;
+  if (!url.startsWith("libsql://")) {
+    throw new Error("TURSO_DATABASE_URL must start with libsql:// or https://");
+  }
+  const host = url.slice("libsql://".length).split("/")[0];
+  return { url, token, host };
+}
+
+function quoteIdent(name: string) {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    throw new Error(`Unexpected SQL name: ${name}`);
+  }
+  return `"${name}"`;
+}
+
+type TableColumn = {
+  name: string;
+  type: string;
+  notnull: number;
+  dflt_value: string | null;
+};
+
+function columnDefinition(column: TableColumn) {
+  const type = column.type || "TEXT";
+  if (!column.notnull) return type;
+  if (column.dflt_value !== null) return `${type} NOT NULL DEFAULT ${column.dflt_value}`;
+  const numeric = /INT|REAL|NUM|FLOA|DOUB|DEC/i.test(type);
+  return `${type} NOT NULL DEFAULT ${numeric ? "0" : "''"}`;
+}
+
+function copyKitchenTables(from: Database.Database, to: Database.Database) {
+  const tables = from
+    .prepare(
+      `SELECT name, sql FROM sqlite_master
+       WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'libsql_%'
+       ORDER BY name`,
+    )
+    .all() as { name: string; sql: string | null }[];
+
+  to.exec("PRAGMA foreign_keys = OFF");
+  const copy = to.transaction(() => {
+    for (const table of tables) {
+      const exists = to
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+        .get(table.name) as { name: string } | undefined;
+      if (!exists && table.sql) to.exec(table.sql);
+
+      const columns = from.prepare(`PRAGMA table_info(${quoteIdent(table.name)})`).all() as TableColumn[];
+      const present = new Set(
+        (
+          to.prepare(`PRAGMA table_info(${quoteIdent(table.name)})`).all() as { name: string }[]
+        ).map((column) => column.name),
+      );
+      for (const column of columns) {
+        if (present.has(column.name)) continue;
+        to.exec(
+          `ALTER TABLE ${quoteIdent(table.name)} ADD COLUMN ${quoteIdent(column.name)} ${columnDefinition(column)}`,
+        );
+      }
+      if (columns.length === 0) continue;
+      const rows = from.prepare(`SELECT * FROM ${quoteIdent(table.name)}`).all() as Record<
+        string,
+        unknown
+      >[];
+      if (rows.length === 0) continue;
+      const names = columns.map((column) => quoteIdent(column.name)).join(", ");
+      const placeholders = columns.map(() => "?").join(", ");
+      const insert = to.prepare(
+        `INSERT OR REPLACE INTO ${quoteIdent(table.name)} (${names}) VALUES (${placeholders})`,
+      );
+      for (const row of rows) {
+        insert.run(...columns.map((column) => row[column.name] ?? null));
+      }
+    }
+  });
+  copy();
+  to.exec("PRAGMA foreign_keys = ON");
+}
+
+function importLocalIfRemoteEmpty(remote: Database.Database) {
+  const file = databasePath();
+  if (!fs.existsSync(file)) return;
+  const remoteRows = remote.prepare("SELECT COUNT(*) AS n FROM business_profile").get() as {
+    n: number;
+  };
+  if (remoteRows.n > 0) return;
+
+  const local = new Database(file, { readonly: true, fileMustExist: true });
+  try {
+    const localRows = local.prepare("SELECT COUNT(*) AS n FROM business_profile").get() as {
+      n: number;
+    };
+    if (localRows.n === 0) return;
+    copyKitchenTables(local, remote);
+  } finally {
+    local.close();
+  }
 }
 
 function migrate(db: Database.Database) {
@@ -120,24 +257,59 @@ function migrate(db: Database.Database) {
   `);
 }
 
-export function getDb() {
-  if (!globalForDb.kitchenDb) {
+function stripMetadata<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((entry) => stripMetadata(entry)) as T;
+  if (value && typeof value === "object" && "_metadata" in value) {
+    const rest = { ...(value as Record<string, unknown>) };
+    delete rest._metadata;
+    return rest as T;
+  }
+  return value;
+}
+
+function openDatabase() {
+  const turso = tursoConfig();
+  let db: Database.Database;
+  if (turso) {
+    db = new Database(turso.url, { authToken: turso.token } as Database.Options);
+  } else {
     const file = databasePath();
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    const db = new Database(file);
+    db = new Database(file);
     db.pragma("journal_mode = WAL");
-    db.pragma("foreign_keys = ON");
     db.pragma("busy_timeout = 5000");
-    migrate(db);
-    seed(db);
-    globalForDb.kitchenDb = db;
   }
+  const prepare = db.prepare.bind(db);
+  db.prepare = ((source: string) => {
+    const statement = prepare(source);
+    const get = statement.get.bind(statement);
+    const all = statement.all.bind(statement);
+    statement.get = (...params: unknown[]) => stripMetadata(get(...params));
+    statement.all = (...params: unknown[]) => stripMetadata(all(...params));
+    return statement;
+  }) as Database.Database["prepare"];
+  return db;
+}
+
+export function getDb() {
+  if (!globalForDb.kitchenDb) {
+    opening = true;
+    try {
+      const db = openDatabase();
+      db.pragma("foreign_keys = ON");
+      migrate(db);
+      globalForDb.kitchenDb = db;
+      if (tursoConfig()) importLocalIfRemoteEmpty(db);
+      seed(db);
+      globalForDb.tenancyReady = true;
+      initTenancy();
+    } finally {
+      opening = false;
+    }
+  }
+  if (!globalForDb.kitchenDb) throw new Error("Kitchen database failed to open");
+  if (opening) return globalForDb.kitchenDb;
   reframeLegacyLunchSample(globalForDb.kitchenDb);
-  if (!globalForDb.tenancyReady) {
-    globalForDb.tenancyReady = true;
-    initTenancy();
-  }
   keepSampleAsNorthBowl(globalForDb.kitchenDb);
   return globalForDb.kitchenDb;
 }
-
