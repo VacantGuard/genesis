@@ -45,3 +45,5 @@ next-env.d.ts
 # local kitchen database
 /data/*.sqlite
 /data/*.sqlite-*
+/data/*.db
+/data/*.db-*

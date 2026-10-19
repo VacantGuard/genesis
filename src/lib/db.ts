@@ -20,12 +20,15 @@ export type NewOrderInput = {
   cardLast4: string;
   lines: OrderLineInput[];
   smsOptIn?: boolean;
+  stripeSessionId?: string;
 };
 
 const globalForDb = globalThis as unknown as {
   kitchenDb?: Database.Database;
   tenancyReady?: boolean;
   envLoaded?: boolean;
+  maintenanceDone?: boolean;
+  syncTimer?: ReturnType<typeof setTimeout>;
 };
 
 let opening = false;
@@ -267,25 +270,52 @@ function stripMetadata<T>(value: T): T {
   return value;
 }
 
+function scheduleSync(db: Database.Database) {
+  if (opening || !tursoConfig()) return;
+  if (globalForDb.syncTimer) clearTimeout(globalForDb.syncTimer);
+  globalForDb.syncTimer = setTimeout(() => {
+    try {
+      db.sync();
+    } catch (error) {
+      console.error("Turso sync failed", error);
+    }
+  }, 200);
+}
+
 function openDatabase() {
   const turso = tursoConfig();
   let db: Database.Database;
   if (turso) {
-    db = new Database(turso.url, { authToken: turso.token } as Database.Options);
+    const file = path.join(process.cwd(), "data", "turso-replica.db");
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    db = new Database(file, { syncUrl: turso.url, authToken: turso.token } as Database.Options);
+    db.sync();
   } else {
     const file = databasePath();
     fs.mkdirSync(path.dirname(file), { recursive: true });
     db = new Database(file);
-    db.pragma("journal_mode = WAL");
-    db.pragma("busy_timeout = 5000");
   }
+  db.pragma("journal_mode = WAL");
+  db.pragma("busy_timeout = 5000");
+  const exec = db.exec.bind(db);
+  db.exec = (source: string) => {
+    const result = exec(source);
+    scheduleSync(db);
+    return result;
+  };
   const prepare = db.prepare.bind(db);
   db.prepare = ((source: string) => {
     const statement = prepare(source);
     const get = statement.get.bind(statement);
     const all = statement.all.bind(statement);
+    const run = statement.run.bind(statement);
     statement.get = (...params: unknown[]) => stripMetadata(get(...params));
     statement.all = (...params: unknown[]) => stripMetadata(all(...params));
+    statement.run = (...params: unknown[]) => {
+      const result = run(...params);
+      scheduleSync(db);
+      return result;
+    };
     return statement;
   }) as Database.Database["prepare"];
   return db;
@@ -309,7 +339,10 @@ export function getDb() {
   }
   if (!globalForDb.kitchenDb) throw new Error("Kitchen database failed to open");
   if (opening) return globalForDb.kitchenDb;
-  reframeLegacyLunchSample(globalForDb.kitchenDb);
-  keepSampleAsNorthBowl(globalForDb.kitchenDb);
+  if (!globalForDb.maintenanceDone) {
+    reframeLegacyLunchSample(globalForDb.kitchenDb);
+    keepSampleAsNorthBowl(globalForDb.kitchenDb);
+    globalForDb.maintenanceDone = true;
+  }
   return globalForDb.kitchenDb;
 }
