@@ -16,6 +16,14 @@ export default async function CustomerLoginPage() {
       <h1 className="mt-2 text-4xl font-medium tracking-tight">Sign in</h1>
       <p className="mt-3 text-sm text-[#5c5e62]">Use the email and password for your meal account.</p>
       <AccountAuthForm mode="login" />
+      <form action="/account/bypass" method="post" className="mt-8 border-t border-black/10 pt-6">
+        <p className="text-sm text-[#5c5e62]">
+          Temporary bypass. This opens the customer dashboard without a password.
+        </p>
+        <button type="submit" className="mt-3 text-sm font-medium underline">
+          Continue without signing in
+        </button>
+      </form>
       <Link href="/account/signup" className="mt-6 text-sm underline">
         Create an account
       </Link>

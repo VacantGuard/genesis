@@ -4,6 +4,7 @@ import { getHomepageBusiness } from "./businesses";
 import { getDb } from "./db";
 
 const COOKIE = "customer_session";
+const BYPASS_COOKIE = "customer_bypass";
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const SESSION_SECRET = process.env.SESSION_SECRET || "kitchen-local-session-secret";
 
@@ -99,12 +100,25 @@ async function writeCookie(accountId: number) {
 
 export async function clearCustomerSession() {
   const jar = await cookies();
-  jar.set(COOKIE, "", {
+  const cleared = {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  };
+  jar.set(COOKIE, "", cleared);
+  jar.set(BYPASS_COOKIE, "", cleared);
+}
+
+export async function startCustomerBypass() {
+  const jar = await cookies();
+  jar.set(BYPASS_COOKIE, "1", {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 0,
+    maxAge: MAX_AGE_SECONDS,
   });
 }
 
@@ -122,11 +136,27 @@ function accountById(id: number): CustomerAccount | null {
   return row ?? null;
 }
 
+function bypassAccount(): CustomerAccount {
+  const business = getHomepageBusiness();
+  return {
+    id: 0,
+    businessId: business.id,
+    customerId: 0,
+    email: "",
+    name: "Guest",
+    phone: "",
+  };
+}
+
 export async function currentCustomer(): Promise<CustomerAccount | null> {
   const jar = await cookies();
   const session = read(jar.get(COOKIE)?.value);
-  if (!session) return null;
-  return accountById(session.accountId);
+  if (session) {
+    const account = accountById(session.accountId);
+    if (account) return account;
+  }
+  if (jar.get(BYPASS_COOKIE)?.value === "1") return bypassAccount();
+  return null;
 }
 
 function findCustomer(businessId: number, email: string, phone: string) {

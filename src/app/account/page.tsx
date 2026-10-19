@@ -28,10 +28,18 @@ export default async function AccountPage() {
         </div>
       </header>
       <div className="mx-auto max-w-3xl px-6 py-12">
-        <h1 className="text-4xl font-medium tracking-tight">{account.name}</h1>
-        <p className="mt-2 text-sm text-[#5c5e62]">
-          {account.email} · {account.phone}
-        </p>
+        <h1 className="text-4xl font-medium tracking-tight">
+          {account.id === 0 ? "Customer dashboard" : account.name}
+        </h1>
+        {account.id === 0 ? (
+          <p className="mt-2 text-sm text-[#5c5e62]">
+            Sign-in is temporarily skipped. Orders appear here after you check out with a phone number on an account.
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-[#5c5e62]">
+            {account.email} · {account.phone}
+          </p>
+        )}
         <h2 className="mt-12 text-2xl font-medium tracking-tight">Orders</h2>
         {orders.length === 0 ? (
           <p className="mt-4 text-sm text-[#5c5e62]">
