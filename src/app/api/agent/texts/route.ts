@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { businessForAgentToken } from "@/lib/agent";
-import { menuLink } from "@/lib/businesses";
+import { menuLink, rememberPublicOrigin } from "@/lib/businesses";
 import { publicOrigin } from "@/lib/menu-memory";
 import { sendCampaign } from "@/lib/texts";
 
@@ -24,6 +24,7 @@ export async function POST(request: Request) {
   if (message.length < 2 || message.length > 480) {
     return NextResponse.json({ error: "Write a message between 2 and 480 characters." }, { status: 400 });
   }
+  rememberPublicOrigin(business.id, publicOrigin(request));
   const includeCustomers = body?.includeCustomers !== false;
   const includeCompanyContacts = body?.includeCompanyContacts === true;
   if (!includeCustomers && !includeCompanyContacts) {

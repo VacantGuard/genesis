@@ -1,4 +1,4 @@
-import { getHomepageBusiness } from "@/lib/businesses";
+import { getHomepageBusiness, rememberPublicOrigin } from "@/lib/businesses";
 import { publicOrigin, renderMenuMemory, renderMenuMemoryPage } from "@/lib/menu-memory";
 
 export const runtime = "nodejs";
@@ -10,6 +10,7 @@ export async function GET(request: Request) {
     return new Response("That menu is not available.\n", { status: 404 });
   }
   const origin = publicOrigin(request);
+  rememberPublicOrigin(business.id, origin);
   const wantsMarkdown =
     new URL(request.url).searchParams.get("format") === "md" ||
     (request.headers.get("accept") ?? "").includes("text/markdown");

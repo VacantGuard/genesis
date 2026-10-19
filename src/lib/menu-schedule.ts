@@ -1,5 +1,5 @@
 import { getDb } from "./db";
-import { menuLink } from "./businesses";
+import { menuLink, rememberedOrigin } from "./businesses";
 import { sendCampaign } from "./texts";
 
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
@@ -86,7 +86,7 @@ export function saveMenuTextSchedule(
   if (input.hour < 0 || input.hour > 23 || input.minute < 0 || input.minute > 59) {
     throw new Error("Enter a time like 9:00am.");
   }
-  let timezone = input.timezone.trim() || DEFAULT_TIMEZONE;
+  const timezone = input.timezone.trim() || DEFAULT_TIMEZONE;
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
   } catch {
@@ -146,9 +146,10 @@ export function localStamp(now: Date, timeZone: string): LocalStamp {
   }).formatToParts(now);
   const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
   const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(pick("weekday"));
+  const hour = Number(pick("hour"));
   return {
     weekday,
-    hour: Number(pick("hour")),
+    hour: hour === 24 ? 0 : hour,
     minute: Number(pick("minute")),
     date: `${pick("year")}-${pick("month")}-${pick("day")}`,
   };
@@ -178,7 +179,7 @@ export async function sendDueMenuTexts(now = new Date()) {
     const result = await sendCampaign({
       businessId: business.id,
       message: schedule.message,
-      linkUrl: menuLink(business.slug),
+      linkUrl: menuLink(business.slug, rememberedOrigin(business.id) || undefined),
       includeCustomers: true,
       includeCompanyContacts: false,
     });

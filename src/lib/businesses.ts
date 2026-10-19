@@ -182,6 +182,37 @@ export function setSlackConnection(id: number, teamId: string | null, teamName: 
   ).run(teamId, teamName, new Date().toISOString(), id);
 }
 
+function ensurePublicOriginColumn() {
+  const db = getDb();
+  const names = new Set(
+    (db.prepare("PRAGMA table_info(businesses)").all() as { name: string }[]).map((column) => column.name),
+  );
+  if (!names.has("public_origin")) {
+    db.exec("ALTER TABLE businesses ADD COLUMN public_origin TEXT NOT NULL DEFAULT ''");
+  }
+}
+
+export function rememberPublicOrigin(businessId: number, origin: string | undefined) {
+  if (!origin?.startsWith("https://")) return;
+  let host = "";
+  try {
+    host = new URL(origin).host;
+  } catch {
+    return;
+  }
+  if (!host || host.startsWith("localhost") || host.endsWith(".local")) return;
+  ensurePublicOriginColumn();
+  getDb().prepare("UPDATE businesses SET public_origin = ? WHERE id = ?").run(origin.replace(/\/$/, ""), businessId);
+}
+
+export function rememberedOrigin(businessId: number) {
+  ensurePublicOriginColumn();
+  const row = getDb().prepare("SELECT public_origin AS origin FROM businesses WHERE id = ?").get(businessId) as
+    | { origin: string }
+    | undefined;
+  return row?.origin || process.env.PUBLIC_BASE_URL || "";
+}
+
 export function menuLink(slug: string, origin?: string) {
   const base = (origin || process.env.PUBLIC_BASE_URL || "http://127.0.0.1:43123").replace(/\/$/, "");
   return `${base}/b/${slug}#pos`;
