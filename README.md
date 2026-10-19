@@ -8,9 +8,11 @@ The public page (`/`) has three sections:
 - **About** — copy from the editable business profile
 - **POS** — cart, customer details, delivery address, and a practice card payment that records a paid order for delivery
 
-The staff terminal (`/terminal`) is a separate login-gated desk for the weekly menu, customers (with delivery addresses), companies, text campaigns, paid orders, and the business profile.
+The staff terminal (`/terminal`) is a separate login-gated desk for the weekly menu, customers (with delivery addresses), companies, text campaigns, paid orders, agent settings, and the business profile.
 
 Payment and texting are local mocks. No card is charged, and no SMS leaves the machine. Every meal order is delivered; driver routing software is not included yet. The agent can read client drops at `GET /api/agent/clients` (optional `?q=` filter), including a Google Maps `locateUrl` for each address.
+
+**Public site URL for agents:** save it on Terminal → Agent. Menu texts and agent payloads use that sticky URL (`…/#pos`). They do not follow localhost or a changing tunnel host.
 
 ## Run it
 

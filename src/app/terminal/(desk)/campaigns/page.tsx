@@ -1,12 +1,13 @@
 import { CampaignComposer } from "@/components/terminal/campaign-composer";
 import { Badge } from "@/components/ui/badge";
-import { listCampaigns, listCompanies, listCustomers } from "@/lib/db";
+import { getAgentSettings, listCampaigns, listCompanies, listCustomers } from "@/lib/db";
 import { formatWhen } from "@/lib/format";
 
 export default function CampaignsPage() {
   const customers = listCustomers();
   const companies = listCompanies();
   const campaigns = listCampaigns();
+  const agent = getAgentSettings();
 
   return (
     <>
@@ -14,7 +15,18 @@ export default function CampaignsPage() {
         <h1 className="font-heading text-3xl tracking-tight">Text campaigns</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
           Choose customers, company contacts, or both. Sending writes each text to the local log.
-          No SMS provider is called.
+          No SMS provider is called. The menu link comes from{" "}
+          <a href="/terminal/agent" className="text-primary underline-offset-2 hover:underline">
+            Terminal → Agent
+          </a>
+          {agent.menuLinkUrl ? (
+            <>
+              {" "}
+              (<a href={agent.menuLinkUrl} className="underline-offset-2 hover:underline">{agent.menuLinkUrl}</a>).
+            </>
+          ) : (
+            <> — set the public site URL there before sending.</>
+          )}
         </p>
       </div>
       <CampaignComposer customers={customers} companies={companies} />

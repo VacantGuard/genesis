@@ -18,6 +18,7 @@ import {
   formatDeliveryAddress,
   type DeliveryAddress,
 } from "@/lib/delivery";
+import { menuLinkFromPublicSiteUrl, normalizePublicSiteUrl } from "@/lib/site-url";
 
 export class OrderError extends Error {}
 
@@ -152,6 +153,14 @@ function migrate(db: Database.Database) {
       status TEXT NOT NULL DEFAULT 'logged',
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS agent_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      public_site_url TEXT NOT NULL DEFAULT '',
+      webhook_url TEXT NOT NULL DEFAULT '',
+      webhook_token TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    );
   `);
 
   ensureColumn(db, "customers", "delivery_line1", "TEXT NOT NULL DEFAULT ''");
@@ -164,6 +173,14 @@ function migrate(db: Database.Database) {
   ensureColumn(db, "orders", "delivery_city", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "orders", "delivery_state", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "orders", "delivery_postal_code", "TEXT NOT NULL DEFAULT ''");
+
+  const agentRow = db.prepare("SELECT id FROM agent_settings WHERE id = 1").get();
+  if (!agentRow) {
+    db.prepare(
+      `INSERT INTO agent_settings (id, public_site_url, webhook_url, webhook_token, updated_at)
+       VALUES (1, '', '', '', ?)`,
+    ).run(new Date().toISOString());
+  }
 }
 
 const SAMPLE_NAME = "Hearth Prep";
@@ -462,6 +479,74 @@ export function updateProfile(name: string, about: string) {
       "UPDATE business_profile SET name = ?, about = ?, updated_at = ? WHERE id = 1",
     )
     .run(name, about, new Date().toISOString());
+}
+
+export type AgentSettings = {
+  publicSiteUrl: string;
+  webhookUrl: string;
+  webhookToken: string;
+  /** Menu / POS link built from the sticky public site URL. Empty until set. */
+  menuLinkUrl: string;
+};
+
+export function getAgentSettings(): AgentSettings {
+  const row = getDb()
+    .prepare(
+      `SELECT
+         public_site_url AS publicSiteUrl,
+         webhook_url AS webhookUrl,
+         webhook_token AS webhookToken
+       FROM agent_settings WHERE id = 1`,
+    )
+    .get() as
+    | { publicSiteUrl: string; webhookUrl: string; webhookToken: string }
+    | undefined;
+  if (!row) {
+    return { publicSiteUrl: "", webhookUrl: "", webhookToken: "", menuLinkUrl: "" };
+  }
+  const publicSiteUrl = normalizePublicSiteUrl(row.publicSiteUrl);
+  const site = publicSiteUrl === null ? "" : publicSiteUrl;
+  return {
+    publicSiteUrl: site,
+    webhookUrl: row.webhookUrl,
+    webhookToken: row.webhookToken,
+    menuLinkUrl: menuLinkFromPublicSiteUrl(site),
+  };
+}
+
+export function saveAgentSettings(input: {
+  publicSiteUrl: string;
+  webhookUrl: string;
+  webhookToken: string;
+}) {
+  const publicSiteUrl = normalizePublicSiteUrl(input.publicSiteUrl);
+  if (publicSiteUrl === null) {
+    throw new OrderError("Enter a full http(s) URL for the public site.");
+  }
+  const webhookUrl = input.webhookUrl.trim();
+  if (webhookUrl) {
+    try {
+      const parsed = new URL(webhookUrl);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new OrderError("Webhook URL must start with http:// or https://.");
+      }
+    } catch (error) {
+      if (error instanceof OrderError) throw error;
+      throw new OrderError("That webhook URL does not look right.");
+    }
+  }
+  getDb()
+    .prepare(
+      `UPDATE agent_settings
+       SET public_site_url = ?, webhook_url = ?, webhook_token = ?, updated_at = ?
+       WHERE id = 1`,
+    )
+    .run(publicSiteUrl, webhookUrl, input.webhookToken.trim(), new Date().toISOString());
+}
+
+/** Lasting menu link for texts and the agent. Does not follow the request host. */
+export function getConfiguredMenuLink(): string {
+  return getAgentSettings().menuLinkUrl;
 }
 
 export function listCategories(): MenuCategory[] {

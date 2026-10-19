@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   clearSessionCookie,
@@ -16,8 +15,10 @@ import {
   deleteCompany,
   deleteCustomer,
   deleteMenuItem,
+  getConfiguredMenuLink,
   OrderError,
   renameCategory,
+  saveAgentSettings,
   saveCompany,
   saveCustomer,
   sendCampaign,
@@ -256,6 +257,24 @@ export async function deleteCustomerAction(formData: FormData) {
   saved("/terminal/customers", "Customer removed. Past orders stay on the list.");
 }
 
+export async function saveAgentSettingsAction(formData: FormData) {
+  await requireSession();
+  try {
+    saveAgentSettings({
+      publicSiteUrl: field(formData, "publicSiteUrl"),
+      webhookUrl: field(formData, "webhookUrl"),
+      webhookToken: field(formData, "webhookToken"),
+    });
+  } catch (error) {
+    if (error instanceof OrderError) bounce("/terminal/agent", error.message);
+    throw error;
+  }
+  saved(
+    "/terminal/agent",
+    "Agent settings saved. Menu texts and the agent will keep using this public site URL.",
+  );
+}
+
 export async function sendCampaignAction(input: {
   message: string;
   includeCustomers: boolean;
@@ -270,10 +289,13 @@ export async function sendCampaignAction(input: {
     return { ok: false, error: "Choose customers, company contacts, or both." };
   }
 
-  const headerStore = await headers();
-  const host = headerStore.get("x-forwarded-host") || headerStore.get("host") || "localhost:43123";
-  const proto = headerStore.get("x-forwarded-proto") || "http";
-  const linkUrl = `${proto}://${host}/#pos`;
+  const linkUrl = getConfiguredMenuLink();
+  if (!linkUrl) {
+    return {
+      ok: false,
+      error: "Set the public site URL on Terminal → Agent first. Texts use that lasting link, not this request’s host.",
+    };
+  }
 
   try {
     const result = sendCampaign({

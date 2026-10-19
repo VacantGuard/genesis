@@ -11,6 +11,7 @@ const links = [
   { href: "/terminal/companies", label: "Companies" },
   { href: "/terminal/campaigns", label: "Texts" },
   { href: "/terminal/orders", label: "Orders" },
+  { href: "/terminal/agent", label: "Agent" },
   { href: "/terminal/profile", label: "Business" },
 ];
 
