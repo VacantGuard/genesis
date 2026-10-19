@@ -14,10 +14,9 @@ export default function PrivacyPage() {
         payment. North Bowl uses that information to prepare the order, send a receipt, and, only if
         you check the menu-text box, send the weekly menu and menu updates you asked for.
       </p>
-      <p>
-        Menu texts are about one to four messages a week. Message and data rates may apply. You can
-        reply STOP to opt out or HELP for help.
-      </p>
+      <p>You may receive up to 4 messages per week. Message and data rates may apply.</p>
+      <p>You can reply STOP to opt out or HELP for help.</p>
+      <p>We will not share your mobile numbers with third parties.</p>
       <p>
         We do not sell or share your SMS opt-in data or personal information with third parties for
         marketing purposes.

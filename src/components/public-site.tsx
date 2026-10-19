@@ -413,7 +413,7 @@ export function PublicSite({
                     </Link>{" "}
                     and{" "}
                     <Link href="/terms" className="underline">
-                      Terms
+                      Terms and Conditions
                     </Link>
                     .
                   </span>
@@ -439,7 +439,7 @@ export function PublicSite({
               Privacy Policy
             </Link>
             <Link href="/terms" className="hover:text-foreground">
-              Terms
+              Terms and Conditions
             </Link>
             <Link href="/terminal" className="hover:text-foreground">
               Staff terminal
