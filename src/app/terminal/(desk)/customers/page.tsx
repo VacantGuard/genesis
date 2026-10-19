@@ -81,7 +81,7 @@ export default async function CustomersPage({
         <div className="flex gap-2">
           <Button type="submit">{editing ? "Save customer" : "Add customer"}</Button>
           {editing ? (
-            <Button type="button" variant="outline" render={<a href="/terminal/customers" />}>
+            <Button type="button" variant="outline" nativeButton={false} render={<a href="/terminal/customers" />}>
               Cancel
             </Button>
           ) : null}
@@ -112,7 +112,7 @@ export default async function CustomersPage({
                 <TableCell className="max-w-xs whitespace-normal">{customer.notes || "—"}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" render={<a href={`/terminal/customers?edit=${customer.id}`} />}>
+                    <Button variant="outline" size="sm" nativeButton={false} render={<a href={`/terminal/customers?edit=${customer.id}`} />}>
                       Edit
                     </Button>
                     <form action={deleteCustomerAction}>

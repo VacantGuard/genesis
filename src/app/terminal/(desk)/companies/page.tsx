@@ -73,7 +73,7 @@ export default async function CompaniesPage({
         <div className="flex gap-2">
           <Button type="submit">{editing ? "Save company" : "Add company"}</Button>
           {editing ? (
-            <Button type="button" variant="outline" render={<a href="/terminal/companies" />}>
+            <Button type="button" variant="outline" nativeButton={false} render={<a href="/terminal/companies" />}>
               Cancel
             </Button>
           ) : null}
@@ -102,7 +102,7 @@ export default async function CompaniesPage({
                 <TableCell className="whitespace-normal">{company.email || "—"}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" render={<a href={`/terminal/companies?edit=${company.id}`} />}>
+                    <Button variant="outline" size="sm" nativeButton={false} render={<a href={`/terminal/companies?edit=${company.id}`} />}>
                       Edit
                     </Button>
                     <form action={deleteCompanyAction}>
