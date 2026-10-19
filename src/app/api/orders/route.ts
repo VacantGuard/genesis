@@ -24,6 +24,8 @@ type Body = {
     postalCode?: string;
   };
   card?: { number?: string; expiry?: string; cvc?: string; name?: string };
+  /** Testing only: record a paid order with no card check. */
+  skipPayment?: boolean;
   lines?: { menuItemId?: number; quantity?: number }[];
 };
 
@@ -73,14 +75,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Add at least one meal." }, { status: 400 });
   }
 
-  const card = validateMockCard({
-    number: clean(body.card?.number, 24),
-    expiry: clean(body.card?.expiry, 7),
-    cvc: clean(body.card?.cvc, 4),
-    name: clean(body.card?.name, 80),
-  });
-  if (!card.ok) {
-    return NextResponse.json({ error: card.error }, { status: 400 });
+  const skipPayment = body.skipPayment === true;
+  let cardLast4 = "TEST";
+  if (!skipPayment) {
+    const card = validateMockCard({
+      number: clean(body.card?.number, 24),
+      expiry: clean(body.card?.expiry, 7),
+      cvc: clean(body.card?.cvc, 4),
+      name: clean(body.card?.name, 80),
+    });
+    if (!card.ok) {
+      return NextResponse.json({ error: card.error }, { status: 400 });
+    }
+    cardLast4 = card.last4;
   }
 
   const slug = clean(body.businessSlug, 80);
@@ -97,11 +104,11 @@ export async function POST(request: Request) {
       companyName,
       notes,
       smsOptIn: body.smsOptIn === true,
-      cardLast4: card.last4,
+      cardLast4,
       delivery,
       lines: [...merged.entries()].map(([menuItemId, quantity]) => ({ menuItemId, quantity })),
     });
-    return NextResponse.json(order);
+    return NextResponse.json({ ...order, skipPayment });
   } catch (error) {
     if (error instanceof OrderError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

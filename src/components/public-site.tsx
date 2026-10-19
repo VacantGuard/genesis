@@ -17,6 +17,7 @@ type Confirmation = {
   deliveryLocateUrl?: string;
   items: { name: string; quantity: number; unitPriceCents: number }[];
   last4: string;
+  skipPayment?: boolean;
 };
 
 export function PublicSite({
@@ -85,8 +86,7 @@ export function PublicSite({
     });
   }
 
-  async function pay(event: React.FormEvent) {
-    event.preventDefault();
+  async function submitOrder(skipPayment: boolean) {
     setError("");
     setPending(true);
     try {
@@ -100,6 +100,7 @@ export function PublicSite({
           companyName,
           notes,
           smsOptIn,
+          skipPayment,
           delivery: {
             line1: deliveryLine1,
             line2: deliveryLine2,
@@ -108,16 +109,22 @@ export function PublicSite({
             postalCode: deliveryPostalCode,
           },
           businessSlug,
-          card: { name: cardName, number: cardNumber, expiry, cvc },
+          card: skipPayment
+            ? undefined
+            : { name: cardName, number: cardNumber, expiry, cvc },
           lines: lines.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity })),
         }),
       });
-      const data = (await response.json()) as Confirmation & { error?: string };
+      const data = (await response.json()) as Confirmation & { error?: string; skipPayment?: boolean };
       if (!response.ok) {
         setError(data.error || "The order was not recorded.");
         return;
       }
-      setConfirmation({ ...data, last4: cardNumber.replace(/\D/g, "").slice(-4) });
+      setConfirmation({
+        ...data,
+        last4: skipPayment ? "TEST" : cardNumber.replace(/\D/g, "").slice(-4),
+        skipPayment,
+      });
       setCart({});
       setCardNumber("");
       setCvc("");
@@ -127,6 +134,11 @@ export function PublicSite({
     } finally {
       setPending(false);
     }
+  }
+
+  async function pay(event: React.FormEvent) {
+    event.preventDefault();
+    await submitOrder(false);
   }
 
   const field = "h-10 rounded bg-[#f4f4f4] border-0 shadow-none focus-visible:ring-[#171a20]";
@@ -290,9 +302,15 @@ export function PublicSite({
                 <p className="text-sm text-[#5c5e62]">Paid</p>
                 <h3 className="mt-2 text-4xl font-medium tracking-tight">{confirmation.orderNumber}</h3>
                 <p className="mt-3 text-sm text-muted-foreground">
-                  {confirmation.customerName}, your meal order is paid
-                  {confirmation.deliveryAddress ? ` and queued for delivery to ${confirmation.deliveryAddress}` : ""}.
-                  Card ending {confirmation.last4}. This was a practice payment.
+                  {confirmation.customerName}, your meal order is{" "}
+                  {confirmation.skipPayment ? "recorded for testing (no payment)" : "paid"}
+                  {confirmation.deliveryAddress
+                    ? ` and queued for delivery to ${confirmation.deliveryAddress}`
+                    : ""}
+                  .
+                  {confirmation.skipPayment
+                    ? " No card was used."
+                    : ` Card ending ${confirmation.last4}. This was a practice payment.`}
                   {smsOptIn
                     ? ` You are enrolled in ${profile.name} menu texts. A confirmation text welcomes you to the program. Reply STOP to opt out or HELP for help.`
                     : ""}
@@ -511,9 +529,19 @@ export function PublicSite({
                 >
                   {pending ? "Recording payment…" : `Pay ${formatMoney(total)}`}
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={pending || lines.length === 0}
+                  className="h-10 rounded"
+                  onClick={() => void submitOrder(true)}
+                >
+                  {pending ? "Recording order…" : "Place test order (no card)"}
+                </Button>
                 <p className="text-xs text-muted-foreground">
-                  Use 4242 4242 4242 4242, any future expiry, and any 3-digit code. Only the last
-                  four digits are stored.
+                  Practice card: 4242 4242 4242 4242, any future expiry, any 3-digit code. Or use
+                  “Place test order (no card)” to checkout without payment for testing. Only the last
+                  four digits are stored when a card is used.
                 </p>
               </form>
             )}
