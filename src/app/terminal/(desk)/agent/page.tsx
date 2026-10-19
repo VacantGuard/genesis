@@ -17,12 +17,15 @@ export default async function AgentPage({
   const business = await currentBusiness();
   const settings = agentSettings(business.id);
   const triggers = listTriggers(business.id);
-  const publicOrigin = rememberedOrigin(business.id);
+  const publicOriginSaved = rememberedOrigin(business.id);
   const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") || headerStore.get("host") || "127.0.0.1:43123";
   const proto = headerStore.get("x-forwarded-proto") || "http";
-  const memoryUrl = `${proto}://${host}/api/menu/memory`;
-  const stickyMenu = publicOrigin ? menuLink(business.slug, publicOrigin) : "";
+  const requestOrigin = `${proto}://${host}`;
+  const agentOrigin = publicOriginSaved || requestOrigin;
+  const memoryUrl = `${agentOrigin}/api/menu/memory`;
+  const statusUrl = `${agentOrigin}/api/agent/status`;
+  const stickyMenu = publicOriginSaved ? menuLink(business.slug, publicOriginSaved) : "";
 
   return (
     <>
@@ -40,7 +43,7 @@ export default async function AgentPage({
           <Input
             name="publicOrigin"
             type="url"
-            defaultValue={publicOrigin}
+            defaultValue={publicOriginSaved}
             placeholder="https://your-tunnel-or-domain.example"
             className="h-10 bg-card"
           />
@@ -71,13 +74,25 @@ export default async function AgentPage({
         </div>
       </form>
       <section className="grid max-w-2xl gap-2 text-sm">
-        <h2 className="font-heading text-2xl tracking-tight">Menu memory</h2>
+        <h2 className="font-heading text-2xl tracking-tight">URLs for John Wick (n8n)</h2>
         <p className="text-muted-foreground">
-          The Slack agent answers menu, client, and payment questions from this page. Clients stay
-          on the Customers page. A paid checkout is an order matched by phone. This page lists
-          both, so the agent does not need a separate client file.
+          If Slack says “incorrect host (domain)”, the HTTP Request tools still point at an old
+          tunnel. Paste these hosts into every John Wick tool that reads the desk. Use the Bearer
+          token below on status / texts / schedule.
         </p>
-        <p className="break-all text-muted-foreground">{memoryUrl}</p>
+        <p className="break-all">
+          Menu memory (no auth):{" "}
+          <a href={memoryUrl} className="text-primary underline-offset-2 hover:underline">
+            {memoryUrl}
+          </a>
+        </p>
+        <p className="break-all">
+          Orders / status:{" "}
+          <span className="font-mono text-xs">{statusUrl}</span>
+        </p>
+        <p className="break-all text-muted-foreground">
+          Authorization: Bearer {settings.token}
+        </p>
       </section>
       <section className="grid max-w-2xl gap-2 text-sm">
         <h2 className="font-heading text-2xl tracking-tight">What n8n can ask</h2>
