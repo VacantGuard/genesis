@@ -43,6 +43,7 @@ export type Company = {
 
 export type Customer = {
   id: number;
+  clientNumber: string;
   name: string;
   phone: string;
   email: string;

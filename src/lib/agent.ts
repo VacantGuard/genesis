@@ -4,6 +4,7 @@ import { getDb } from "./db.ts";
 import { listCompanies, listCustomers } from "./directory.ts";
 
 export type MenuClient = {
+  clientNumber: string;
   name: string;
   phone: string;
   email: string;
@@ -11,6 +12,7 @@ export type MenuClient = {
 };
 
 export type OrderMatch = {
+  clientNumber: string;
   name: string;
   phone: string;
   email: string;
@@ -140,6 +142,7 @@ export function orderBoard(businessId: number) {
     });
     if (match < 0) {
       notOrdered.push({
+        clientNumber: customer.clientNumber,
         name: customer.name,
         phone: customer.phone,
         email: customer.email,
@@ -149,6 +152,7 @@ export function orderBoard(businessId: number) {
     }
     used.add(match);
     ordered.push({
+      clientNumber: customer.clientNumber,
       name: customer.name,
       phone: customer.phone,
       email: customer.email,
@@ -159,6 +163,7 @@ export function orderBoard(businessId: number) {
   orders.forEach((order, index) => {
     if (used.has(index)) return;
     ordered.push({
+      clientNumber: "",
       name: order.customerName,
       phone: order.phone,
       email: "",
@@ -171,6 +176,7 @@ export function orderBoard(businessId: number) {
 
 function menuClients(businessId: number): MenuClient[] {
   const clients: MenuClient[] = listCustomers(businessId).map((customer) => ({
+    clientNumber: customer.clientNumber,
     name: customer.name,
     phone: customer.phone,
     email: customer.email,
@@ -179,6 +185,7 @@ function menuClients(businessId: number): MenuClient[] {
   for (const company of listCompanies(businessId)) {
     if (digits(company.phone).length < 7) continue;
     clients.push({
+      clientNumber: "",
       name: company.contactName || company.name,
       phone: company.phone,
       email: company.email,

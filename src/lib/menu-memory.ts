@@ -15,11 +15,13 @@ export function publicOrigin(request: Request) {
 export function paymentBoard(business: BusinessRecord) {
   const board = orderBoard(business.id);
   const paid = board.ordered.map((order) => ({
+    clientNumber: order.clientNumber,
     name: order.name,
     phone: order.phone,
     orderNumber: order.orderNumber,
   }));
   const notPaid = board.notOrdered.map((client) => ({
+    clientNumber: client.clientNumber,
     name: client.name,
     phone: client.phone,
   }));
@@ -31,19 +33,19 @@ export function renderPaymentBoard(business: BusinessRecord) {
   const lines = [
     `# ${business.name} payments`,
     board.since
-      ? `Since the latest menu update (${formatWhen(board.since)}). Paid means a checkout matched by phone.`
-      : "No menu update is saved yet. Paid means any checkout on the desk, matched by phone.",
+      ? `Since the latest menu update (${formatWhen(board.since)}). Each client has a client number. Paid means a checkout matched by phone.`
+      : "No menu update is saved yet. Each client has a client number. Paid means any checkout on the desk, matched by phone.",
     "",
     "## Paid",
   ];
   if (board.paid.length === 0) lines.push("Nobody has paid.");
   for (const client of board.paid) {
-    lines.push(`- ${client.name} | ${client.phone} | ${client.orderNumber}`);
+    lines.push(`- ${client.clientNumber || "—"} | ${client.name} | ${client.phone} | ${client.orderNumber}`);
   }
   lines.push("", "## Not paid");
   if (board.notPaid.length === 0) lines.push("Every saved client has paid.");
   for (const client of board.notPaid) {
-    lines.push(`- ${client.name} | ${client.phone}`);
+    lines.push(`- ${client.clientNumber || "—"} | ${client.name} | ${client.phone}`);
   }
   lines.push("");
   return lines.join("\n");
@@ -84,12 +86,12 @@ export function renderMenuMemory(business: BusinessRecord, origin?: string) {
   lines.push("", "## Clients");
   const customers = listCustomers(business.id);
   if (customers.length === 0) {
-    lines.push("No clients are saved. Add them on the Customers page. An order is matched to a client by phone.");
+    lines.push("No clients are saved. Add them on the Customers page. Each client gets a client number. An order is matched to that client by phone.");
   }
   for (const customer of customers) {
     const contact = [customer.phone, customer.email].filter(Boolean).join(", ");
     const company = customer.companyName ? ` (${customer.companyName})` : "";
-    lines.push(`- ${customer.name}${company}${contact ? ` — ${contact}` : ""}`);
+    lines.push(`- ${customer.clientNumber} | ${customer.name}${company}${contact ? ` — ${contact}` : ""}`);
   }
   const companies = listCompanies(business.id);
   if (companies.length > 0) {

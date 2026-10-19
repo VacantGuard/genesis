@@ -4,12 +4,14 @@ import { sendTextMessage, textCredentials, textSettings } from "./messaging.ts";
 import type { Campaign, SmsDelivery } from "./types.ts";
 
 type SmsRecipient = {
+  clientNumber: string;
   name: string;
   phone: string;
   kind: "customer" | "company_contact";
 };
 
 export type CampaignRecipient = {
+  clientNumber: string;
   name: string;
   phone: string;
   status: "logged" | "sent" | "failed";
@@ -39,12 +41,12 @@ export async function sendCampaign(input: {
 
   if (input.includeCustomers) {
     for (const customer of listCustomers(input.businessId)) {
-      push({ name: customer.name, phone: customer.phone, kind: "customer" });
+      push({ clientNumber: customer.clientNumber, name: customer.name, phone: customer.phone, kind: "customer" });
     }
   }
   if (input.includeCompanyContacts) {
     for (const company of listCompanies(input.businessId)) {
-      push({ name: company.contactName || company.name, phone: company.phone, kind: "company_contact" });
+      push({ clientNumber: "", name: company.contactName || company.name, phone: company.phone, kind: "company_contact" });
     }
   }
   if (recipients.length === 0) throw new OrderError("That audience has no phone numbers to log.");
@@ -94,6 +96,7 @@ export async function sendCampaign(input: {
       mode: "logged" as const,
       recipients: recipients.map(
         (recipient): CampaignRecipient => ({
+          clientNumber: recipient.clientNumber,
           name: recipient.name,
           phone: recipient.phone,
           status: "logged",
@@ -116,6 +119,7 @@ export async function sendCampaign(input: {
     else failedCount += 1;
     mark.run(status, result.detail, row.id);
     outcomes.push({
+      clientNumber: recipient.clientNumber,
       name: recipient.name,
       phone: recipient.phone,
       status,

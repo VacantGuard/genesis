@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Flash } from "@/components/flash";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,7 @@ export default async function CustomersPage({
       <div>
         <h1 className="font-heading text-3xl tracking-tight">Customers</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          People you can include in a text campaign. A customer can belong to a company.
+          Each client has a client number the agent uses to track them. Open a name to see previous orders.
         </p>
       </div>
       <Flash error={query.error} saved={query.saved} />
@@ -81,7 +82,7 @@ export default async function CustomersPage({
         <div className="flex gap-2">
           <Button type="submit">{editing ? "Save customer" : "Add customer"}</Button>
           {editing ? (
-            <Button type="button" variant="outline" nativeButton={false} render={<a href="/terminal/customers" />}>
+            <Button type="button" variant="outline" nativeButton={false} render={<Link href="/terminal/customers" />}>
               Cancel
             </Button>
           ) : null}
@@ -94,6 +95,7 @@ export default async function CustomersPage({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Client</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Email</TableHead>
@@ -105,14 +107,19 @@ export default async function CustomersPage({
           <TableBody>
             {customers.map((customer) => (
               <TableRow key={customer.id}>
-                <TableCell className="whitespace-normal">{customer.name}</TableCell>
+                <TableCell className="font-medium">{customer.clientNumber}</TableCell>
+                <TableCell className="whitespace-normal">
+                  <Link href={`/terminal/customers/${customer.id}`} className="underline">
+                    {customer.name}
+                  </Link>
+                </TableCell>
                 <TableCell>{customer.phone || "—"}</TableCell>
                 <TableCell className="whitespace-normal">{customer.email || "—"}</TableCell>
                 <TableCell className="whitespace-normal">{customer.companyName || "—"}</TableCell>
                 <TableCell className="max-w-xs whitespace-normal">{customer.notes || "—"}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" nativeButton={false} render={<a href={`/terminal/customers?edit=${customer.id}`} />}>
+                    <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/terminal/customers?edit=${customer.id}`} />}>
                       Edit
                     </Button>
                     <form action={deleteCustomerAction}>

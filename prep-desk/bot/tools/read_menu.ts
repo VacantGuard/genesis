@@ -22,6 +22,7 @@ export default defineTool({
       menu: getPublicMenu(operating.business.id),
       clients: [
         ...board.ordered.map((order) => ({
+          clientNumber: order.clientNumber,
           name: order.name,
           phone: order.phone,
           email: order.email,
@@ -29,6 +30,7 @@ export default defineTool({
           orderNumber: order.orderNumber,
         })),
         ...board.notOrdered.map((client) => ({
+          clientNumber: client.clientNumber,
           name: client.name,
           phone: client.phone,
           email: client.email,

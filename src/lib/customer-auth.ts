@@ -1,6 +1,8 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { getHomepageBusiness } from "./businesses";
+import { ordersForCustomerRecord, syncOrdersToCustomer } from "./customer-orders";
+import { ensureClientNumbers } from "./directory";
 import { getDb } from "./db";
 
 const COOKIE = "customer_session";
@@ -222,6 +224,9 @@ export function registerCustomerAccount(input: { name: string; phone: string; em
     return Number(account.lastInsertRowid);
   })();
 
+  ensureClientNumbers(business.id);
+  const linked = accountById(accountId);
+  if (linked) syncOrdersToCustomer(linked.businessId, linked.customerId, linked.phone, linked.email);
   return { ok: true as const, accountId };
 }
 
@@ -250,34 +255,18 @@ export async function signInCustomer(input: { email: string; password: string })
 }
 
 export function ordersForCustomer(account: CustomerAccount): CustomerOrder[] {
-  const phone = digits(account.phone);
-  const db = getDb();
-  const orders = db
-    .prepare(
-      `SELECT id, order_number AS orderNumber, phone, total_cents AS totalCents,
-              created_at AS createdAt, status
-       FROM orders WHERE business_id = ? ORDER BY id DESC`,
-    )
-    .all(account.businessId) as {
-    id: number;
-    orderNumber: string;
-    phone: string;
-    totalCents: number;
-    createdAt: string;
-    status: string;
-  }[];
-  const mine = orders.filter((order) => digits(order.phone) === phone).slice(0, 20);
-  const items = db.prepare(
-    `SELECT item_name AS name, quantity FROM order_items WHERE order_id = ? ORDER BY id`,
-  );
-  return mine.map((order) => {
-    const lines = items.all(order.id) as { name: string; quantity: number }[];
-    return {
+  if (!account.customerId) return [];
+  return ordersForCustomerRecord(account.businessId, {
+    id: account.customerId,
+    phone: account.phone,
+    email: account.email,
+  })
+    .slice(0, 20)
+    .map((order) => ({
       orderNumber: order.orderNumber,
       totalCents: order.totalCents,
       createdAt: order.createdAt,
       status: order.status,
-      items: lines.map((line) => `${line.quantity} × ${line.name}`).join(", "),
-    };
-  });
+      items: order.items.map((line) => `${line.quantity} × ${line.name}`).join(", "),
+    }));
 }
