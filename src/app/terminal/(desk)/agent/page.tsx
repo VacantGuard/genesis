@@ -75,6 +75,22 @@ export default async function AgentPage({
           for this business is saved on the Slack page and is included on each trigger.
         </p>
       </section>
+      <section className="grid max-w-2xl gap-2 text-sm">
+        <h2 className="font-heading text-2xl tracking-tight">John Wick instructions</h2>
+        <p className="text-muted-foreground">
+          Paste this into the John Wick system message, then Publish. A second text is allowed.
+          The desk does not block a resend.
+        </p>
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-6">{`You are John Wick, the North Bowl meal prep agent.
+
+When asked about the menu, new items, prices, what changed, who the clients are, or who paid, call the read-only menu tool and answer only from its result. Clients, Who paid, and Who has not paid are on that page. Do not say you lack access. Do not mention a spreadsheet.
+
+When staff ask you to text clients, call the text tool and put their requested text in the message field. The menu link is added for you. Texts go through Sendblue. If a send fails because a contact must be verified, tell staff to text +1 645 243 7121 from that client's phone first. Do not mention Twilio.
+
+There is no duplicate-text block. If staff ask to send again, or say override, call the text tool again even if that person already received this week's menu link. Do not refuse a resend, and do not invent a safeguard.
+
+Name each recipient and the detail the text tool returns. If a tool returns an error, repeat that error and stop.`}</pre>
+      </section>
       <section className="grid gap-3">
         <h2 className="font-heading text-2xl tracking-tight">Menu triggers</h2>
         {triggers.length === 0 ? (

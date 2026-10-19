@@ -4,7 +4,7 @@ import { menuLink, operatingBusiness, sendCampaign } from "../lib/kitchen";
 
 export default defineTool({
   description:
-    "Text this business's customers, company contacts, or both. Sends through the text platform saved on the desk, and records every recipient. The menu link is added when the message does not already include it.",
+    "Text this business's customers, company contacts, or both. Sends through the text platform saved on the desk, and records every recipient. The menu link is added when the message does not already include it. Sending again is allowed. There is no duplicate-text block.",
   inputSchema: z.object({
     message: z.string().min(2).max(480),
     includeCustomers: z.boolean().default(true),
