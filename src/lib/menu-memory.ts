@@ -3,6 +3,7 @@ import { menuLink, type BusinessRecord } from "./businesses";
 import { listCompanies, listCustomers } from "./directory";
 import { formatMoney, formatWhen } from "./format";
 import { getPublicMenu } from "./menu";
+import { getMenuTextSchedule, scheduleReport } from "./menu-schedule";
 
 export function publicOrigin(request: Request) {
   const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
@@ -54,7 +55,14 @@ export function renderPaymentBoard(business: BusinessRecord) {
 export function renderMenuMemory(business: BusinessRecord, origin?: string) {
   const changes = listTriggers(business.id);
   const menu = getPublicMenu(business.id);
+  const schedule = scheduleReport(getMenuTextSchedule(business.id));
   const lines = [
+    "# What this page answers",
+    "Payments, the weekly menu, saved clients, and the weekly menu text schedule. Quote the section that answers the question. Every status includes a reason. Do not say a reason is missing.",
+    "",
+    "## Weekly menu text",
+    schedule.summary,
+    "",
     renderPaymentBoard(business).trimEnd(),
     "",
     `# ${business.name} weekly menu`,

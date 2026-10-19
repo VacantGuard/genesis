@@ -8,6 +8,7 @@ import { listCompanies, listCustomers } from "@/lib/directory";
 import { formatWhen } from "@/lib/format";
 import { menuLink } from "@/lib/businesses";
 import { textSettings } from "@/lib/messaging";
+import { getMenuTextSchedule, scheduleReport } from "@/lib/menu-schedule";
 import { listCampaigns } from "@/lib/texts";
 
 export default async function CampaignsPage({
@@ -26,6 +27,7 @@ export default async function CampaignsPage({
   const proto = headerStore.get("x-forwarded-proto") || "http";
   const menuUrl = menuLink(business.slug, `${proto}://${host}`);
   const textingReady = texting.ready;
+  const weeklyText = scheduleReport(getMenuTextSchedule(business.id));
 
   return (
     <>
@@ -37,6 +39,7 @@ export default async function CampaignsPage({
         </p>
       </div>
       <Flash error={query.error} saved={query.saved} />
+      <p className="max-w-2xl text-sm">{weeklyText.summary}</p>
       <TextPlatformForm settings={texting} />
       <CampaignComposer
         customers={customers}

@@ -74,18 +74,25 @@ export default async function AgentPage({
           The public menu JSON is GET /api/menu and does not need the token. The Slack workspace id
           for this business is saved on the Slack page and is included on each trigger.
         </p>
+        <p className="text-muted-foreground">
+          A weekly menu text is POST /api/agent/schedule with the same Bearer token. The body is{" "}
+          {`{"weekday":"monday","time":"9:00am","timezone":"America/Chicago","message":"This week's menu is ready."}`}
+          . Blank fields keep the current day, time, or wording. The desk sends it once, at that
+          time, while this site is running. A fixed Monday node in n8n does not move when the agent
+          changes the time.
+        </p>
       </section>
       <section className="grid max-w-2xl gap-2 text-sm">
         <h2 className="font-heading text-2xl tracking-tight">John Wick instructions</h2>
         <p className="text-muted-foreground">
-          Replace the John Wick system message with this, then Publish. On the read-only menu tool,
-          replace the description with the first paragraph under Tool description.
+          Replace the John Wick system message with this, then Publish. Replace each tool description
+          with the matching paragraph below.
         </p>
         <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-6">{`You are John Wick, the North Bowl meal prep agent. Staff talk to you in Slack. Answer only from your tools. Do not invent clients, meals, prices, payments, or texts.
 
 Each saved client has one client number, such as C-1001. That number is how you track a client. When you name a client, start with the client number, then the name. Do not track people by first name alone.
 
-When asked about the menu, prices, what changed, who the clients are, who paid, or who has not paid, call the read-only menu tool first. Answer only from that result. The page starts with the payment board, then the menu, then the client list. Do not say you lack a client directory. Do not mention a spreadsheet.
+When asked about the menu, prices, what changed, who the clients are, who paid, who has not paid, or when the weekly menu text goes out, call the read-only menu tool first. Answer only from that result. The page lists what it answers, then the weekly menu text and its reason, then the payment board, the menu, and the client list. Quote the matching section. Do not say you lack a client directory. Do not say a reason is missing. Do not mention a spreadsheet.
 
 Read the payment board like this. A paid line is: client number | name | phone | order number. A not-paid line is: client number | name | phone. Paid means a checkout since the latest menu update matched that client's phone. A saved client with no matching checkout has not paid. If nobody has paid, say that, then list every not-paid client number.
 
@@ -95,9 +102,13 @@ When staff ask you to text clients, call the text tool and put their requested w
 
 There is no duplicate-text block. If staff ask to send again, or say override, call the text tool again even if that client already received this week's menu. Do not refuse a resend, and do not invent a safeguard.
 
+When staff ask for a recurring menu text, or to change the day or time of that text, call the weekly menu schedule tool. Put the day in weekday, such as monday. Put the clock time in time, such as 9:00am. Use America/Chicago for timezone unless they name another. Put their wording in message when they give it. Leave enabled empty. The word off turns it off only when they say to turn it off. Then repeat the summary word for word, including the reason, and stop. Do not say you cannot create a recurring schedule. Do not send the text tool for a schedule change.
+
 If a tool returns an error, repeat that error and stop.`}</pre>
         <p className="text-muted-foreground">Tool description for the read-only menu HTTP tool:</p>
-        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-6">{`Read North Bowl's weekly menu, client numbers, and who has paid. Each client line starts with a client number such as C-1001. A paid line also has an order number. A not-paid line does not. Call this before answering about the menu, clients, or payments.`}</pre>
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-6">{`Read North Bowl's weekly menu, client numbers, who has paid, and when the weekly menu text is scheduled. The page starts by listing what it answers. The weekly menu text section includes a reason. Quote that section for schedule questions. Each client line starts with a client number such as C-1001. A paid line also has an order number. A not-paid line does not. Call this before answering about the menu, clients, payments, or the weekly text schedule.`}</pre>
+        <p className="text-muted-foreground">Tool description for the weekly menu schedule HTTP tool:</p>
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-6">{`Set North Bowl's weekly menu text. Call this when staff ask to send the menu on a schedule or to change that day or time. weekday is a day name such as monday. time is a clock time such as 9:00am. timezone is America/Chicago unless they name another. message is the wording. Leave a field blank to keep its current value. Leave enabled blank. Send off only when staff say to turn the weekly text off. The response always has a reason and a summary. Repeat the summary word for word. This does not send the text immediately.`}</pre>
       </section>
       <section className="grid gap-3">
         <h2 className="font-heading text-2xl tracking-tight">Menu triggers</h2>
