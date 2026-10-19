@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { PublicSite } from "@/components/public-site";
+import { currentCustomer } from "@/lib/customer-auth";
 import { getBusinessBySlug } from "@/lib/businesses";
 import { getPublicMenu } from "@/lib/menu";
 
@@ -21,11 +22,13 @@ export default async function BusinessMenuPage({ params }: { params: Promise<{ s
   const business = getBusinessBySlug(slug);
   if (!business) notFound();
   const menu = getPublicMenu(business.id);
+  const account = await currentCustomer();
   return (
     <PublicSite
       profile={{ name: business.name, about: business.about }}
       menu={menu}
       businessSlug={business.slug}
+      accountName={account && account.businessId === business.id ? account.name : null}
     />
   );
 }

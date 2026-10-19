@@ -5,7 +5,7 @@ export const metadata: Metadata = { title: "Privacy Policy" };
 
 export default function PrivacyPage() {
   return (
-    <main className="mx-auto grid max-w-2xl gap-4 px-4 py-12 text-sm leading-6">
+    <main className="mx-auto grid max-w-2xl gap-4 bg-white px-6 py-20 text-sm leading-7 text-[#171a20]">
       <h1 className="font-heading text-4xl tracking-tight">Privacy Policy</h1>
       <p>This policy is for North Bowl, the brand registered for these text messages.</p>
       <p>

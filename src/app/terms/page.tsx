@@ -5,7 +5,7 @@ export const metadata: Metadata = { title: "Terms and Conditions" };
 
 export default function TermsPage() {
   return (
-    <main className="mx-auto grid max-w-2xl gap-4 px-4 py-12 text-sm leading-6">
+    <main className="mx-auto grid max-w-2xl gap-4 bg-white px-6 py-20 text-sm leading-7 text-[#171a20]">
       <h1 className="font-heading text-4xl tracking-tight">Terms and Conditions</h1>
       <p>These are the Terms of Service for North Bowl.</p>
       <p>

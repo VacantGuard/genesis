@@ -1,4 +1,5 @@
 import { PublicSite } from "@/components/public-site";
+import { currentCustomer } from "@/lib/customer-auth";
 import { getHomepageBusiness } from "@/lib/businesses";
 import { getPublicMenu } from "@/lib/menu";
 
@@ -13,14 +14,16 @@ export async function generateMetadata() {
   };
 }
 
-export default function HomePage() {
+export default async function HomePage() {
   const business = getHomepageBusiness();
   const menu = getPublicMenu(business.id);
+  const account = await currentCustomer();
   return (
     <PublicSite
       profile={{ name: business.name, about: business.about }}
       menu={menu}
       businessSlug={business.slug}
+      accountName={account?.name ?? null}
     />
   );
 }

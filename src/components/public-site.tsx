@@ -21,10 +21,12 @@ export function PublicSite({
   profile,
   menu,
   businessSlug,
+  accountName,
 }: {
   profile: BusinessProfile;
   menu: PublicCategory[];
   businessSlug: string;
+  accountName?: string | null;
 }) {
   const [cart, setCart] = useState<Record<number, number>>({});
   const [customerName, setCustomerName] = useState("");
@@ -113,80 +115,93 @@ export function PublicSite({
     }
   }
 
+  const field = "h-10 rounded bg-[#f4f4f4] border-0 shadow-none focus-visible:ring-[#171a20]";
+
   return (
-    <div className="min-h-screen pb-24 md:pb-0">
-      <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <a href="#top" className="font-heading text-lg tracking-tight">
+    <div className="min-h-screen bg-white pb-16 text-[#171a20] md:pb-0">
+      <header className="fixed inset-x-0 top-0 z-30 bg-[#171a20]/80 text-white backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
+          <a href="#top" className="text-sm font-medium tracking-wide">
             {profile.name}
           </a>
-          <nav className="flex items-center gap-4 text-sm">
-            <a href="#menu" className="hover:text-primary">
+          <nav className="flex items-center gap-6 text-sm font-medium">
+            <a href="#menu" className="hidden hover:text-white/80 sm:inline">
               Menu
             </a>
-            <a href="#about" className="hover:text-primary">
+            <a href="#about" className="hidden hover:text-white/80 sm:inline">
               About
             </a>
-            <a href="#pos" className="hover:text-primary">
-              POS
+            <a href="#pos" className="hover:text-white/80">
+              Order
             </a>
-            <Link href="/terminal" className="text-muted-foreground hover:text-foreground">
-              Staff
+            <Link href={accountName ? "/account" : "/account/login"} className="hover:text-white/80">
+              {accountName ? accountName.split(" ")[0] : "Sign in"}
             </Link>
           </nav>
         </div>
       </header>
 
       <main id="top">
-        <section className="mx-auto max-w-5xl px-4 py-14 sm:py-20">
-          <p className="text-xs font-medium tracking-[0.22em] text-primary uppercase">
-            Weekly meal prep
+        <section className="flex min-h-[100svh] flex-col items-center justify-end bg-[#171a20] px-6 pb-24 pt-20 text-center text-white">
+          <p className="text-sm tracking-[0.18em] text-white/70 uppercase">Weekly meal prep</p>
+          <h1 className="mt-3 text-5xl font-medium tracking-tight sm:text-7xl">{profile.name}</h1>
+          <p className="mt-3 max-w-md text-sm text-white/80">
+            Portioned meals for the week. Order here, then pick them up at the kitchen.
           </p>
-          <h1 className="font-heading mt-3 max-w-3xl text-5xl leading-[0.95] font-medium tracking-tight sm:text-7xl">
-            {profile.name}
-          </h1>
-          <p className="mt-5 max-w-xl text-lg text-muted-foreground">
-            Portioned meals for the week. Order and pay on this page, then pick them up at the kitchen.
-          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-4">
+            <a
+              href="#pos"
+              className="inline-flex h-10 min-w-40 items-center justify-center rounded bg-white px-8 text-sm font-medium text-[#171a20]"
+            >
+              Order
+            </a>
+            <a
+              href="#menu"
+              className="inline-flex h-10 min-w-40 items-center justify-center rounded bg-white/15 px-8 text-sm font-medium text-white backdrop-blur"
+            >
+              Menu
+            </a>
+          </div>
         </section>
 
-        <section id="menu" className="scroll-mt-20 border-t">
-          <div className="mx-auto max-w-5xl px-4 py-12">
-            <div className="mb-8 flex items-end justify-between gap-4">
-              <h2 className="font-heading text-3xl font-medium tracking-tight">Menu</h2>
-              <p className="text-sm text-muted-foreground">This week</p>
-            </div>
+        <section id="menu" className="scroll-mt-14 bg-white">
+          <div className="mx-auto max-w-5xl px-6 py-20">
+            <h2 className="text-center text-4xl font-medium tracking-tight">This week</h2>
             {menu.every((category) => category.items.length === 0) ? (
-              <p className="text-muted-foreground">
+              <p className="mt-8 text-center text-sm text-[#5c5e62]">
                 The weekly menu is empty. Meals added in the staff terminal show up here.
               </p>
             ) : (
-              <div className="grid gap-12">
+              <div className="mt-14 grid gap-16">
                 {menu.map((category) => (
                   <div key={category.id}>
-                    <h3 className="text-xs font-medium tracking-[0.18em] text-primary uppercase">
-                      {category.name}
-                    </h3>
-                    <ul className="mt-4 divide-y">
+                    <h3 className="text-sm tracking-[0.16em] text-[#5c5e62] uppercase">{category.name}</h3>
+                    <ul className="mt-4">
                       {category.items.map((item) => (
-                        <li key={item.id} className="grid gap-3 py-4 sm:grid-cols-[1fr_auto] sm:items-start">
+                        <li
+                          key={item.id}
+                          className="grid gap-4 border-b border-black/10 py-8 sm:grid-cols-[1fr_auto] sm:items-center"
+                        >
                           <div>
-                            <div className="flex items-baseline gap-3">
-                              <p className="font-medium">{item.name}</p>
-                              <span className="mb-1 hidden flex-1 border-b border-dotted border-foreground/25 sm:block" />
-                              <p className="shrink-0">{formatMoney(item.priceCents)}</p>
+                            <div className="flex items-baseline justify-between gap-6">
+                              <p className="text-2xl font-medium tracking-tight">{item.name}</p>
+                              <p className="text-sm">{formatMoney(item.priceCents)}</p>
                             </div>
-                            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                              {item.description}
-                            </p>
+                            <p className="mt-2 max-w-xl text-sm text-[#5c5e62]">{item.description}</p>
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div>
                             {item.available ? (
-                              <Button type="button" onClick={() => add(item.id)}>
-                                {cart[item.id] ? `Add · ${cart[item.id]}` : "Add"}
+                              <Button
+                                type="button"
+                                onClick={() => add(item.id)}
+                                className="h-10 min-w-28 rounded bg-[#171a20] text-white hover:bg-black"
+                              >
+                                {cart[item.id] ? `Added ${cart[item.id]}` : "Add"}
                               </Button>
                             ) : (
-                              <Badge variant="outline">Sold out</Badge>
+                              <Badge variant="outline" className="rounded border-black/20 text-[#5c5e62]">
+                                Sold out
+                              </Badge>
                             )}
                           </div>
                         </li>
@@ -199,23 +214,20 @@ export function PublicSite({
           </div>
         </section>
 
-        <section id="about" className="scroll-mt-20 border-t bg-card">
-          <div className="mx-auto grid max-w-5xl gap-6 px-4 py-12 md:grid-cols-[12rem_1fr]">
-            <h2 className="font-heading text-3xl font-medium tracking-tight">About</h2>
-            <div className="max-w-2xl space-y-4 text-base leading-7 whitespace-pre-wrap">
-              {profile.about}
-            </div>
+        <section id="about" className="scroll-mt-14 bg-[#171a20] text-white">
+          <div className="mx-auto max-w-3xl px-6 py-24 text-center">
+            <h2 className="text-4xl font-medium tracking-tight">About</h2>
+            <div className="mt-6 text-sm leading-7 whitespace-pre-wrap text-white/80">{profile.about}</div>
           </div>
         </section>
 
-        <section id="pos" className="scroll-mt-20 border-t bg-foreground text-background">
-          <div className="mx-auto grid max-w-5xl gap-8 px-4 py-12 lg:grid-cols-[1fr_1.1fr]">
+        <section id="pos" className="scroll-mt-14 bg-[#f4f4f4]">
+          <div className="mx-auto grid max-w-5xl gap-12 px-6 py-20 lg:grid-cols-[0.9fr_1.1fr]">
             <div>
-              <p className="text-xs font-medium tracking-[0.18em] text-background/70 uppercase">POS</p>
-              <h2 className="font-heading mt-2 text-3xl font-medium tracking-tight">Pay and order</h2>
-              <p className="mt-3 max-w-md text-sm text-background/75">
-                Order this week’s meals. Practice checkout: the card is checked here and the order
-                is marked paid. No charge is sent to a bank.
+              <h2 className="text-4xl font-medium tracking-tight">Order</h2>
+              <p className="mt-3 max-w-md text-sm text-[#5c5e62]">
+                Practice checkout. The card is checked here and the order is marked paid. No charge
+                is sent to a bank.
               </p>
               <div className="mt-6 grid gap-3">
                 {lines.length === 0 ? (
@@ -225,14 +237,12 @@ export function PublicSite({
                     <div key={line.item.id} className="flex items-center justify-between gap-3 text-sm">
                       <div>
                         <p>{line.item.name}</p>
-                        <p className="text-background/60">
-                          {formatMoney(line.item.priceCents)} each
-                        </p>
+                        <p className="text-[#5c5e62]">{formatMoney(line.item.priceCents)} each</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          className="size-8 rounded-md border border-background/30"
+                          className="size-8 rounded bg-white"
                           onClick={() => setQuantity(line.item.id, line.quantity - 1)}
                           aria-label={`Remove one ${line.item.name}`}
                         >
@@ -241,7 +251,7 @@ export function PublicSite({
                         <span className="w-6 text-center">{line.quantity}</span>
                         <button
                           type="button"
-                          className="size-8 rounded-md border border-background/30"
+                          className="size-8 rounded bg-white"
                           onClick={() => setQuantity(line.item.id, line.quantity + 1)}
                           aria-label={`Add one ${line.item.name}`}
                         >
@@ -255,16 +265,16 @@ export function PublicSite({
                   ))
                 )}
               </div>
-              <p className="mt-6 flex justify-between border-t border-background/20 pt-4 text-lg">
+              <p className="mt-6 flex justify-between border-t border-black/10 pt-4 text-lg">
                 <span>Total</span>
                 <span>{formatMoney(total)}</span>
               </p>
             </div>
 
             {confirmation ? (
-              <div className="rounded-2xl bg-background p-6 text-foreground">
-                <p className="text-xs font-medium tracking-[0.18em] text-primary uppercase">Paid</p>
-                <h3 className="font-heading mt-2 text-4xl tracking-tight">{confirmation.orderNumber}</h3>
+              <div className="bg-white p-8">
+                <p className="text-sm text-[#5c5e62]">Paid</p>
+                <h3 className="mt-2 text-4xl font-medium tracking-tight">{confirmation.orderNumber}</h3>
                 <p className="mt-3 text-sm text-muted-foreground">
                   {confirmation.customerName}, your meal order is paid. Card ending {confirmation.last4}.
                   This was a practice payment.
@@ -285,15 +295,14 @@ export function PublicSite({
                 <p className="mt-4 font-medium">{formatMoney(confirmation.totalCents)}</p>
                 <Button
                   type="button"
-                  className="mt-6"
-                  variant="outline"
+                  className="mt-6 h-10 rounded bg-[#171a20] text-white hover:bg-black"
                   onClick={() => setConfirmation(null)}
                 >
                   Start another order
                 </Button>
               </div>
             ) : (
-              <form onSubmit={pay} className="grid gap-3 rounded-2xl bg-background p-5 text-foreground">
+              <form onSubmit={pay} className="grid gap-3 bg-white p-6 sm:p-8">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-1.5 text-sm sm:col-span-2">
                     <span className="font-medium">Name</span>
@@ -302,7 +311,7 @@ export function PublicSite({
                       onChange={(event) => setCustomerName(event.target.value)}
                       required
                       autoComplete="name"
-                      className="h-10 bg-card"
+                      className={field}
                     />
                   </label>
                   <label className="grid gap-1.5 text-sm">
@@ -312,7 +321,7 @@ export function PublicSite({
                       onChange={(event) => setPhone(event.target.value)}
                       required
                       autoComplete="tel"
-                      className="h-10 bg-card"
+                      className={field}
                     />
                   </label>
                   <label className="grid gap-1.5 text-sm">
@@ -323,7 +332,7 @@ export function PublicSite({
                       onChange={(event) => setEmail(event.target.value)}
                       required
                       autoComplete="email"
-                      className="h-10 bg-card"
+                      className={field}
                     />
                   </label>
                   <label className="grid gap-1.5 text-sm sm:col-span-2">
@@ -332,7 +341,7 @@ export function PublicSite({
                       value={companyName}
                       onChange={(event) => setCompanyName(event.target.value)}
                       placeholder="Optional"
-                      className="h-10 bg-card"
+                      className={field}
                     />
                   </label>
                   <label className="grid gap-1.5 text-sm sm:col-span-2">
@@ -340,7 +349,7 @@ export function PublicSite({
                     <Textarea
                       value={notes}
                       onChange={(event) => setNotes(event.target.value)}
-                      className="min-h-20 bg-card"
+                      className={`min-h-20 ${field}`}
                       placeholder="Optional"
                     />
                   </label>
@@ -353,7 +362,7 @@ export function PublicSite({
                       onChange={(event) => setCardName(event.target.value)}
                       required
                       autoComplete="cc-name"
-                      className="h-10 bg-card"
+                      className={field}
                     />
                   </label>
                   <label className="grid gap-1.5 text-sm sm:col-span-2">
@@ -365,7 +374,7 @@ export function PublicSite({
                       onChange={(event) => setCardNumber(event.target.value)}
                       placeholder="4242 4242 4242 4242"
                       required
-                      className="h-10 bg-card"
+                      className={field}
                     />
                   </label>
                   <label className="grid gap-1.5 text-sm">
@@ -376,7 +385,7 @@ export function PublicSite({
                       placeholder="12/28"
                       autoComplete="cc-exp"
                       required
-                      className="h-10 bg-card"
+                      className={field}
                     />
                   </label>
                   <label className="grid gap-1.5 text-sm">
@@ -387,7 +396,7 @@ export function PublicSite({
                       placeholder="123"
                       autoComplete="cc-csc"
                       required
-                      className="h-10 bg-card"
+                      className={field}
                     />
                   </label>
                 </div>
@@ -418,7 +427,11 @@ export function PublicSite({
                     .
                   </span>
                 </label>
-                <Button type="submit" disabled={pending || lines.length === 0} className="mt-2 h-11">
+                <Button
+                  type="submit"
+                  disabled={pending || lines.length === 0}
+                  className="mt-2 h-10 rounded bg-[#3e6ae1] text-white hover:bg-[#3457b1]"
+                >
                   {pending ? "Recording payment…" : `Pay ${formatMoney(total)}`}
                 </Button>
                 <p className="text-xs text-muted-foreground">
@@ -431,8 +444,8 @@ export function PublicSite({
         </section>
       </main>
 
-      <footer className="border-t">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-muted-foreground">
+      <footer className="bg-white">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-8 text-xs text-[#5c5e62]">
           <p>{profile.name}</p>
           <span className="flex gap-4">
             <Link href="/privacy" className="hover:text-foreground">
@@ -451,10 +464,10 @@ export function PublicSite({
       {count > 0 && !confirmation ? (
         <a
           href="#pos"
-          className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between rounded-full bg-primary px-4 py-3 text-sm text-primary-foreground shadow-lg md:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between bg-[#171a20] px-6 py-4 text-sm text-white md:hidden"
         >
           <span>
-            POS · {count} item{count === 1 ? "" : "s"}
+            Order · {count} item{count === 1 ? "" : "s"}
           </span>
           <span>{formatMoney(total)}</span>
         </a>

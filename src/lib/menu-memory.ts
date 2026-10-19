@@ -12,10 +12,49 @@ export function publicOrigin(request: Request) {
   return process.env.PUBLIC_BASE_URL;
 }
 
+export function paymentBoard(business: BusinessRecord) {
+  const board = orderBoard(business.id);
+  const paid = board.ordered.map((order) => ({
+    name: order.name,
+    phone: order.phone,
+    orderNumber: order.orderNumber,
+  }));
+  const notPaid = board.notOrdered.map((client) => ({
+    name: client.name,
+    phone: client.phone,
+  }));
+  return { since: board.trigger?.createdAt ?? null, paid, notPaid };
+}
+
+export function renderPaymentBoard(business: BusinessRecord) {
+  const board = paymentBoard(business);
+  const lines = [
+    `# ${business.name} payments`,
+    board.since
+      ? `Since the latest menu update (${formatWhen(board.since)}). Paid means a checkout matched by phone.`
+      : "No menu update is saved yet. Paid means any checkout on the desk, matched by phone.",
+    "",
+    "## Paid",
+  ];
+  if (board.paid.length === 0) lines.push("Nobody has paid.");
+  for (const client of board.paid) {
+    lines.push(`- ${client.name} | ${client.phone} | ${client.orderNumber}`);
+  }
+  lines.push("", "## Not paid");
+  if (board.notPaid.length === 0) lines.push("Every saved client has paid.");
+  for (const client of board.notPaid) {
+    lines.push(`- ${client.name} | ${client.phone}`);
+  }
+  lines.push("");
+  return lines.join("\n");
+}
+
 export function renderMenuMemory(business: BusinessRecord, origin?: string) {
   const changes = listTriggers(business.id);
   const menu = getPublicMenu(business.id);
   const lines = [
+    renderPaymentBoard(business).trimEnd(),
+    "",
     `# ${business.name} weekly menu`,
     "",
     `Public menu: ${menuLink(business.slug, origin)}`,
@@ -42,7 +81,6 @@ export function renderMenuMemory(business: BusinessRecord, origin?: string) {
       if (item.description) lines.push(`  ${item.description}`);
     }
   }
-  const board = orderBoard(business.id);
   lines.push("", "## Clients");
   const customers = listCustomers(business.id);
   if (customers.length === 0) {
@@ -52,26 +90,6 @@ export function renderMenuMemory(business: BusinessRecord, origin?: string) {
     const contact = [customer.phone, customer.email].filter(Boolean).join(", ");
     const company = customer.companyName ? ` (${customer.companyName})` : "";
     lines.push(`- ${customer.name}${company}${contact ? ` — ${contact}` : ""}`);
-  }
-  lines.push("", "## Who paid");
-  lines.push("Paid means a checkout order since the latest menu update. Match is by phone, then by name.");
-  if (!board.trigger) lines.push("No menu update is saved yet, so this list is every order on the desk.");
-  if (board.ordered.length === 0) {
-    lines.push("Nobody has paid since that menu update.");
-  }
-  for (const order of board.ordered) {
-    const contact = [order.phone, order.email].filter(Boolean).join(", ");
-    lines.push(
-      `- ${order.name}${contact ? ` — ${contact}` : ""} — paid — order ${order.orderNumber} — ${formatWhen(order.createdAt)}`,
-    );
-  }
-  lines.push("", "## Who has not paid");
-  if (board.notOrdered.length === 0) {
-    lines.push("Every saved client has paid since that menu update.");
-  }
-  for (const client of board.notOrdered) {
-    const contact = [client.phone, client.email].filter(Boolean).join(", ");
-    lines.push(`- ${client.name}${contact ? ` — ${contact}` : ""} — not paid`);
   }
   const companies = listCompanies(business.id);
   if (companies.length > 0) {
