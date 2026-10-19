@@ -50,6 +50,13 @@ export type Customer = {
   companyId: number | null;
   companyName: string;
   notes: string;
+  deliveryLine1: string;
+  deliveryLine2: string;
+  deliveryCity: string;
+  deliveryState: string;
+  deliveryPostalCode: string;
+  deliveryAddress: string;
+  deliveryLocateUrl: string;
 };
 
 export type OrderItem = {
@@ -69,6 +76,13 @@ export type KitchenOrder = {
   cardLast4: string;
   totalCents: number;
   createdAt: string;
+  deliveryLine1: string;
+  deliveryLine2: string;
+  deliveryCity: string;
+  deliveryState: string;
+  deliveryPostalCode: string;
+  deliveryAddress: string;
+  deliveryLocateUrl: string;
   items: OrderItem[];
 };
 

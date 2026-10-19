@@ -33,7 +33,8 @@ export default async function CustomersPage({
       <div>
         <h1 className="font-heading text-3xl tracking-tight">Customers</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Each client has a client number the agent uses to track them. Open a name to see previous orders.
+          Each client has a client number and a delivery address. The agent uses both to track people and
+          locate meal drops. Open a name to see previous orders.
         </p>
       </div>
       <Flash error={query.error} saved={query.saved} />
@@ -75,6 +76,56 @@ export default async function CustomersPage({
             />
           </label>
           <label className="grid gap-1.5 text-sm md:col-span-2">
+            <span className="font-medium">Delivery street</span>
+            <Input
+              name="deliveryLine1"
+              defaultValue={editing?.deliveryLine1 ?? ""}
+              required
+              autoComplete="address-line1"
+              className="h-10 bg-background"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm md:col-span-2">
+            <span className="font-medium">Apt / suite</span>
+            <Input
+              name="deliveryLine2"
+              defaultValue={editing?.deliveryLine2 ?? ""}
+              autoComplete="address-line2"
+              placeholder="Optional"
+              className="h-10 bg-background"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">City</span>
+            <Input
+              name="deliveryCity"
+              defaultValue={editing?.deliveryCity ?? ""}
+              required
+              autoComplete="address-level2"
+              className="h-10 bg-background"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">State</span>
+            <Input
+              name="deliveryState"
+              defaultValue={editing?.deliveryState ?? ""}
+              required
+              autoComplete="address-level1"
+              className="h-10 bg-background"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">ZIP</span>
+            <Input
+              name="deliveryPostalCode"
+              defaultValue={editing?.deliveryPostalCode ?? ""}
+              required
+              autoComplete="postal-code"
+              className="h-10 bg-background"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm md:col-span-2">
             <span className="font-medium">Notes</span>
             <Textarea name="notes" defaultValue={editing?.notes ?? ""} className="min-h-20 bg-background" />
           </label>
@@ -98,7 +149,7 @@ export default async function CustomersPage({
               <TableHead>Client</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Phone</TableHead>
-              <TableHead>Email</TableHead>
+              <TableHead>Delivery</TableHead>
               <TableHead>Company</TableHead>
               <TableHead>Notes</TableHead>
               <TableHead />
@@ -114,7 +165,25 @@ export default async function CustomersPage({
                   </Link>
                 </TableCell>
                 <TableCell>{customer.phone || "—"}</TableCell>
-                <TableCell className="whitespace-normal">{customer.email || "—"}</TableCell>
+                <TableCell className="max-w-xs whitespace-normal">
+                  {customer.deliveryAddress ? (
+                    <span className="grid gap-1">
+                      <span>{customer.deliveryAddress}</span>
+                      {customer.deliveryLocateUrl ? (
+                        <a
+                          href={customer.deliveryLocateUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-primary underline-offset-2 hover:underline"
+                        >
+                          Locate on map
+                        </a>
+                      ) : null}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
                 <TableCell className="whitespace-normal">{customer.companyName || "—"}</TableCell>
                 <TableCell className="max-w-xs whitespace-normal">{customer.notes || "—"}</TableCell>
                 <TableCell>

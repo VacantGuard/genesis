@@ -3,8 +3,8 @@ import type Database from "libsql";
 export const SAMPLE_NAME = "North Bowl";
 const SAMPLE_ABOUT = [
   "North Bowl is sample copy for a meal prep kitchen. Rewrite it from the staff terminal when this business is real.",
-  "Each week the kitchen cooks a short menu of portioned meals: breakfasts, mains, and sides you can heat through the week. Order and pay on this page. Meals are packed for pickup at the kitchen.",
-  "Sample prep day is Sunday, with pickup Monday to Wednesday. Change the name, this story, and the weekly menu whenever the cook cycle changes. Delivery routing is not part of this desk.",
+  "Each week the kitchen cooks a short menu of portioned meals: breakfasts, mains, and sides you can heat through the week. Order and pay on this page. Every meal order is delivered to the address on the client and ticket.",
+  "Sample prep day is Sunday, with deliveries Monday to Wednesday. Change the name, this story, and the weekly menu whenever the cook cycle changes. Driver routing is not part of this desk yet — addresses live on each client so staff and the agent can locate the drop.",
 ].join("\n\n");
 
 export { SAMPLE_ABOUT };

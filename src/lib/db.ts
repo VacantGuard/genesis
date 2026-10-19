@@ -21,6 +21,13 @@ export type NewOrderInput = {
   lines: OrderLineInput[];
   smsOptIn?: boolean;
   stripeSessionId?: string;
+  delivery?: {
+    line1: string;
+    line2: string;
+    city: string;
+    state: string;
+    postalCode: string;
+  };
 };
 
 const globalForDb = globalThis as unknown as {

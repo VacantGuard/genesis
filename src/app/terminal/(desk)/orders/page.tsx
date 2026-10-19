@@ -37,6 +37,24 @@ export default async function OrdersPage() {
                 {order.customerName}
                 {order.companyName ? ` · ${order.companyName}` : ""} · {order.phone} · {order.email}
               </p>
+              {order.deliveryAddress ? (
+                <p className="text-sm">
+                  Deliver to {order.deliveryAddress}
+                  {order.deliveryLocateUrl ? (
+                    <>
+                      {" · "}
+                      <a
+                        href={order.deliveryLocateUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary underline-offset-2 hover:underline"
+                      >
+                        Locate
+                      </a>
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
               <p className="text-sm text-muted-foreground">Card ending {order.cardLast4}</p>
               {order.notes ? <p className="text-sm">Notes: {order.notes}</p> : null}
               <ul className="grid gap-1 text-sm">

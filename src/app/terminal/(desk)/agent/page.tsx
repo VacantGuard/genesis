@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { agentSettings, listTriggers } from "@/lib/agent";
 import { saveAgentWebhookAction } from "@/lib/business-actions";
+import { menuLink, rememberedOrigin } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
 import { formatWhen } from "@/lib/format";
 
@@ -16,23 +17,42 @@ export default async function AgentPage({
   const business = await currentBusiness();
   const settings = agentSettings(business.id);
   const triggers = listTriggers(business.id);
+  const publicOrigin = rememberedOrigin(business.id);
   const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") || headerStore.get("host") || "127.0.0.1:43123";
   const proto = headerStore.get("x-forwarded-proto") || "http";
   const memoryUrl = `${proto}://${host}/api/menu/memory`;
+  const stickyMenu = publicOrigin ? menuLink(business.slug, publicOrigin) : "";
 
   return (
     <>
       <div>
         <h1 className="font-heading text-3xl tracking-tight">Agent</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          You talk to the agent in Slack. The agent runs in n8n. Paste the n8n webhook URL here.
-          Each menu save sends n8n the new menu link and every client, so the agent can tell them
-          and can tell you in Slack who has ordered.
+          You talk to the agent in Slack. The agent runs in n8n. Paste the lasting public site URL and
+          the n8n webhook here. Menu texts keep the public URL you save — they do not follow localhost.
         </p>
       </div>
       <Flash error={query.error} saved={query.saved} />
       <form action={saveAgentWebhookAction} className="grid max-w-xl gap-3">
+        <label className="grid gap-1.5 text-sm">
+          <span className="font-medium">Public site URL</span>
+          <Input
+            name="publicOrigin"
+            type="url"
+            defaultValue={publicOrigin}
+            placeholder="https://your-tunnel-or-domain.example"
+            className="h-10 bg-card"
+          />
+        </label>
+        {stickyMenu ? (
+          <p className="text-sm text-muted-foreground">
+            Menu link for agents:{" "}
+            <a href={stickyMenu} className="text-primary underline-offset-2 hover:underline">
+              {stickyMenu}
+            </a>
+          </p>
+        ) : null}
         <label className="grid gap-1.5 text-sm">
           <span className="font-medium">n8n webhook URL</span>
           <Input
@@ -47,7 +67,7 @@ export default async function AgentPage({
           field blank and save to stop sending triggers.
         </p>
         <div>
-          <Button type="submit">Save webhook</Button>
+          <Button type="submit">Save agent settings</Button>
         </div>
       </form>
       <section className="grid max-w-2xl gap-2 text-sm">

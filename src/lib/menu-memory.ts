@@ -99,7 +99,12 @@ export function renderMenuMemory(business: BusinessRecord, origin?: string) {
   for (const customer of customers) {
     const contact = [customer.phone, customer.email].filter(Boolean).join(", ");
     const company = customer.companyName ? ` (${customer.companyName})` : "";
-    lines.push(`- ${customer.clientNumber} | ${customer.name}${company}${contact ? ` — ${contact}` : ""}`);
+    const delivery = customer.deliveryAddress
+      ? ` — deliver ${customer.deliveryAddress}${customer.deliveryLocateUrl ? ` | locate ${customer.deliveryLocateUrl}` : ""}`
+      : "";
+    lines.push(
+      `- ${customer.clientNumber} | ${customer.name}${company}${contact ? ` — ${contact}` : ""}${delivery}`,
+    );
   }
   const companies = listCompanies(business.id);
   if (companies.length > 0) {

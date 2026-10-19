@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { currentBusiness } from "@/lib/current-business";
 import { listCompanies, listCustomers } from "@/lib/directory";
 import { formatWhen } from "@/lib/format";
-import { menuLink } from "@/lib/businesses";
+import { menuLink, rememberedOrigin } from "@/lib/businesses";
 import { textSettings } from "@/lib/messaging";
 import { getMenuTextSchedule, scheduleReport } from "@/lib/menu-schedule";
 import { listCampaigns } from "@/lib/texts";
@@ -25,7 +25,8 @@ export default async function CampaignsPage({
   const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") || headerStore.get("host") || "127.0.0.1:43123";
   const proto = headerStore.get("x-forwarded-proto") || "http";
-  const menuUrl = menuLink(business.slug, `${proto}://${host}`);
+  const sticky = rememberedOrigin(business.id);
+  const menuUrl = menuLink(business.slug, sticky || `${proto}://${host}`);
   const textingReady = texting.ready;
   const weeklyText = scheduleReport(getMenuTextSchedule(business.id));
 

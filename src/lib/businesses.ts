@@ -213,6 +213,27 @@ export function rememberedOrigin(businessId: number) {
   return row?.origin || process.env.PUBLIC_BASE_URL || "";
 }
 
+/** Explicit sticky public URL for agents and menu texts (Terminal → Agent). */
+export function setPublicOrigin(businessId: number, origin: string) {
+  ensurePublicOriginColumn();
+  const trimmed = origin.trim().replace(/\/+$/, "");
+  if (!trimmed) {
+    getDb().prepare("UPDATE businesses SET public_origin = '' WHERE id = ?").run(businessId);
+    return;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error("Enter a full http(s) URL for the public site.");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("The public site URL must start with http:// or https://.");
+  }
+  const normalized = `${parsed.protocol}//${parsed.host}`;
+  getDb().prepare("UPDATE businesses SET public_origin = ? WHERE id = ?").run(normalized, businessId);
+}
+
 export function menuLink(slug: string, origin?: string) {
   const base = (origin || process.env.PUBLIC_BASE_URL || "http://127.0.0.1:43123").replace(/\/$/, "");
   return `${base}/b/${slug}#pos`;

@@ -1,7 +1,54 @@
+import {
+  deliveryLocateUrl,
+  formatDeliveryAddress,
+  type DeliveryAddress,
+} from "./delivery.ts";
+import { upsertCustomerDeliveryFromOrder } from "./directory.ts";
 import { getDb, OrderError, type NewOrderInput } from "./db.ts";
 import type { DashboardStats, KitchenOrder } from "./types.ts";
 
 export type { NewOrderInput };
+
+function ensureOrderDeliveryColumns(db: ReturnType<typeof getDb>) {
+  const cols = db.prepare("PRAGMA table_info(orders)").all() as { name: string }[];
+  const names = new Set(cols.map((col) => col.name));
+  for (const column of [
+    "delivery_line1",
+    "delivery_line2",
+    "delivery_city",
+    "delivery_state",
+    "delivery_postal_code",
+  ]) {
+    if (!names.has(column)) {
+      db.exec(`ALTER TABLE orders ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`);
+    }
+  }
+}
+
+function withDelivery(row: {
+  deliveryLine1?: string;
+  deliveryLine2?: string;
+  deliveryCity?: string;
+  deliveryState?: string;
+  deliveryPostalCode?: string;
+}) {
+  const delivery: DeliveryAddress = {
+    line1: row.deliveryLine1 ?? "",
+    line2: row.deliveryLine2 ?? "",
+    city: row.deliveryCity ?? "",
+    state: row.deliveryState ?? "",
+    postalCode: row.deliveryPostalCode ?? "",
+  };
+  return {
+    deliveryLine1: delivery.line1,
+    deliveryLine2: delivery.line2,
+    deliveryCity: delivery.city,
+    deliveryState: delivery.state,
+    deliveryPostalCode: delivery.postalCode,
+    deliveryAddress: formatDeliveryAddress(delivery),
+    deliveryLocateUrl: deliveryLocateUrl(delivery),
+  };
+}
 
 function nextOrderNumber(db: ReturnType<typeof getDb>) {
   const row = db
@@ -42,14 +89,23 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
     if (!orderColumns.some((column) => column.name === "sms_opt_in")) {
       db.exec("ALTER TABLE orders ADD COLUMN sms_opt_in INTEGER NOT NULL DEFAULT 0");
     }
+    ensureOrderDeliveryColumns(db);
+    const delivery = input.delivery ?? {
+      line1: "",
+      line2: "",
+      city: "",
+      state: "",
+      postalCode: "",
+    };
     const totalCents = priced.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0);
     const orderNumber = nextOrderNumber(db);
     const createdAt = new Date().toISOString();
     const inserted = db
       .prepare(
         `INSERT INTO orders
-          (order_number, customer_name, phone, email, company_name, notes, card_last4, total_cents, status, created_at, business_id, sms_opt_in)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?)`,
+          (order_number, customer_name, phone, email, company_name, notes, card_last4, total_cents, status, created_at, business_id, sms_opt_in,
+           delivery_line1, delivery_line2, delivery_city, delivery_state, delivery_postal_code)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         orderNumber,
@@ -63,60 +119,121 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
         createdAt,
         businessId,
         input.smsOptIn ? 1 : 0,
+        delivery.line1,
+        delivery.line2,
+        delivery.city,
+        delivery.state,
+        delivery.postalCode,
       );
     const orderId = Number(inserted.lastInsertRowid);
     const insertItem = db.prepare(
       `INSERT INTO order_items (order_id, item_name, quantity, unit_price_cents) VALUES (?, ?, ?, ?)`,
     );
     for (const line of priced) insertItem.run(orderId, line.name, line.quantity, line.unitPriceCents);
-    return { orderNumber, totalCents, customerName: input.customerName, items: priced };
+    if (delivery.line1) {
+      upsertCustomerDeliveryFromOrder(businessId, {
+        customerName: input.customerName,
+        phone: input.phone,
+        email: input.email,
+        companyName: input.companyName,
+        delivery,
+      });
+    }
+    return {
+      orderNumber,
+      totalCents,
+      customerName: input.customerName,
+      deliveryAddress: formatDeliveryAddress(delivery),
+      deliveryLocateUrl: deliveryLocateUrl(delivery),
+      items: priced,
+    };
   });
   return run();
 }
 
 export function listOrders(businessId: number): KitchenOrder[] {
   const db = getDb();
+  ensureOrderDeliveryColumns(db);
   const orders = db
     .prepare(
       `SELECT id, order_number AS orderNumber, customer_name AS customerName, phone, email,
               company_name AS companyName, notes, card_last4 AS cardLast4,
-              total_cents AS totalCents, created_at AS createdAt
+              total_cents AS totalCents, created_at AS createdAt,
+              delivery_line1 AS deliveryLine1, delivery_line2 AS deliveryLine2,
+              delivery_city AS deliveryCity, delivery_state AS deliveryState,
+              delivery_postal_code AS deliveryPostalCode
        FROM orders WHERE business_id = ? ORDER BY id DESC`,
     )
-    .all(businessId) as Omit<KitchenOrder, "items">[];
+    .all(businessId) as (Omit<KitchenOrder, "items" | "deliveryAddress" | "deliveryLocateUrl"> & {
+      deliveryLine1: string;
+      deliveryLine2: string;
+      deliveryCity: string;
+      deliveryState: string;
+      deliveryPostalCode: string;
+    })[];
   const itemStmt = db.prepare(
     `SELECT item_name AS name, quantity, unit_price_cents AS unitPriceCents
      FROM order_items WHERE order_id = ? ORDER BY id`,
   );
   return orders.map((order) => ({
     ...order,
+    ...withDelivery(order),
     items: itemStmt.all(order.id) as KitchenOrder["items"],
   }));
 }
 
 export function orderExportRows(businessId: number) {
-  return getDb()
+  const db = getDb();
+  ensureOrderDeliveryColumns(db);
+  return db
     .prepare(
       `SELECT o.order_number AS orderNumber, o.customer_name AS customerName,
-              o.company_name AS companyName, o.phone, o.email, oi.item_name AS item,
-              oi.quantity, oi.unit_price_cents AS unitPriceCents, o.notes, o.created_at AS placedAt
+              o.company_name AS companyName, o.phone, o.email,
+              o.delivery_line1 AS deliveryLine1, o.delivery_line2 AS deliveryLine2,
+              o.delivery_city AS deliveryCity, o.delivery_state AS deliveryState,
+              o.delivery_postal_code AS deliveryPostalCode,
+              oi.item_name AS item, oi.quantity, oi.unit_price_cents AS unitPriceCents,
+              o.notes, o.created_at AS placedAt
        FROM orders o
        JOIN order_items oi ON oi.order_id = o.id
        WHERE o.business_id = ?
        ORDER BY o.id DESC, oi.id ASC`,
     )
-    .all(businessId) as {
-    orderNumber: string;
-    customerName: string;
-    companyName: string;
-    phone: string;
-    email: string;
-    item: string;
-    quantity: number;
-    unitPriceCents: number;
-    notes: string;
-    placedAt: string;
-  }[];
+    .all(businessId)
+    .map((row) => {
+      const order = row as {
+        orderNumber: string;
+        customerName: string;
+        companyName: string;
+        phone: string;
+        email: string;
+        deliveryLine1: string;
+        deliveryLine2: string;
+        deliveryCity: string;
+        deliveryState: string;
+        deliveryPostalCode: string;
+        item: string;
+        quantity: number;
+        unitPriceCents: number;
+        notes: string;
+        placedAt: string;
+      };
+      const delivery = withDelivery(order);
+      return {
+        orderNumber: order.orderNumber,
+        customerName: order.customerName,
+        companyName: order.companyName,
+        phone: order.phone,
+        email: order.email,
+        deliveryAddress: delivery.deliveryAddress,
+        deliveryLocateUrl: delivery.deliveryLocateUrl,
+        item: order.item,
+        quantity: order.quantity,
+        unitPriceCents: order.unitPriceCents,
+        notes: order.notes,
+        placedAt: order.placedAt,
+      };
+    });
 }
 
 export function getDashboardStats(businessId: number): DashboardStats {

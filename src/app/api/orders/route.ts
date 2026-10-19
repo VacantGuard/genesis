@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getBusinessBySlug, getHomepageBusiness } from "@/lib/businesses";
 import { OrderError } from "@/lib/db";
+import { readDeliveryAddress, validateDeliveryAddress } from "@/lib/delivery";
 import { placeOrder } from "@/lib/orders";
 import { validateMockCard } from "@/lib/payment";
 
@@ -15,6 +16,13 @@ type Body = {
   companyName?: string;
   notes?: string;
   smsOptIn?: boolean;
+  delivery?: {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+  };
   card?: { number?: string; expiry?: string; cvc?: string; name?: string };
   lines?: { menuItemId?: number; quantity?: number }[];
 };
@@ -45,6 +53,12 @@ export async function POST(request: Request) {
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Enter an email for the receipt." }, { status: 400 });
+  }
+
+  const delivery = readDeliveryAddress(body.delivery ?? {});
+  const deliveryError = validateDeliveryAddress(delivery);
+  if (deliveryError) {
+    return NextResponse.json({ error: deliveryError }, { status: 400 });
   }
 
   const lines = Array.isArray(body.lines) ? body.lines : [];
@@ -84,6 +98,7 @@ export async function POST(request: Request) {
       notes,
       smsOptIn: body.smsOptIn === true,
       cardLast4: card.last4,
+      delivery,
       lines: [...merged.entries()].map(([menuItemId, quantity]) => ({ menuItemId, quantity })),
     });
     return NextResponse.json(order);

@@ -13,6 +13,8 @@ type Confirmation = {
   orderNumber: string;
   totalCents: number;
   customerName: string;
+  deliveryAddress?: string;
+  deliveryLocateUrl?: string;
   items: { name: string; quantity: number; unitPriceCents: number }[];
   last4: string;
 };
@@ -33,6 +35,11 @@ export function PublicSite({
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [deliveryLine1, setDeliveryLine1] = useState("");
+  const [deliveryLine2, setDeliveryLine2] = useState("");
+  const [deliveryCity, setDeliveryCity] = useState("");
+  const [deliveryState, setDeliveryState] = useState("");
+  const [deliveryPostalCode, setDeliveryPostalCode] = useState("");
   const [notes, setNotes] = useState("");
   const [cardName, setCardName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -93,6 +100,13 @@ export function PublicSite({
           companyName,
           notes,
           smsOptIn,
+          delivery: {
+            line1: deliveryLine1,
+            line2: deliveryLine2,
+            city: deliveryCity,
+            state: deliveryState,
+            postalCode: deliveryPostalCode,
+          },
           businessSlug,
           card: { name: cardName, number: cardNumber, expiry, cvc },
           lines: lines.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity })),
@@ -276,12 +290,25 @@ export function PublicSite({
                 <p className="text-sm text-[#5c5e62]">Paid</p>
                 <h3 className="mt-2 text-4xl font-medium tracking-tight">{confirmation.orderNumber}</h3>
                 <p className="mt-3 text-sm text-muted-foreground">
-                  {confirmation.customerName}, your meal order is paid. Card ending {confirmation.last4}.
-                  This was a practice payment.
+                  {confirmation.customerName}, your meal order is paid
+                  {confirmation.deliveryAddress ? ` and queued for delivery to ${confirmation.deliveryAddress}` : ""}.
+                  Card ending {confirmation.last4}. This was a practice payment.
                   {smsOptIn
                     ? ` You are enrolled in ${profile.name} menu texts. A confirmation text welcomes you to the program. Reply STOP to opt out or HELP for help.`
                     : ""}
                 </p>
+                {confirmation.deliveryLocateUrl ? (
+                  <p className="mt-2 text-sm">
+                    <a
+                      href={confirmation.deliveryLocateUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary underline-offset-2 hover:underline"
+                    >
+                      Open delivery location on map
+                    </a>
+                  </p>
+                ) : null}
                 <ul className="mt-4 grid gap-1 text-sm">
                   {confirmation.items.map((item) => (
                     <li key={item.name} className="flex justify-between gap-3">
@@ -341,6 +368,56 @@ export function PublicSite({
                       value={companyName}
                       onChange={(event) => setCompanyName(event.target.value)}
                       placeholder="Optional"
+                      className={field}
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm sm:col-span-2">
+                    <span className="font-medium">Delivery street</span>
+                    <Input
+                      value={deliveryLine1}
+                      onChange={(event) => setDeliveryLine1(event.target.value)}
+                      required
+                      autoComplete="address-line1"
+                      className={field}
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm sm:col-span-2">
+                    <span className="font-medium">Apt / suite</span>
+                    <Input
+                      value={deliveryLine2}
+                      onChange={(event) => setDeliveryLine2(event.target.value)}
+                      autoComplete="address-line2"
+                      placeholder="Optional"
+                      className={field}
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm">
+                    <span className="font-medium">City</span>
+                    <Input
+                      value={deliveryCity}
+                      onChange={(event) => setDeliveryCity(event.target.value)}
+                      required
+                      autoComplete="address-level2"
+                      className={field}
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm">
+                    <span className="font-medium">State</span>
+                    <Input
+                      value={deliveryState}
+                      onChange={(event) => setDeliveryState(event.target.value)}
+                      required
+                      autoComplete="address-level1"
+                      className={field}
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-sm sm:col-span-2">
+                    <span className="font-medium">ZIP</span>
+                    <Input
+                      value={deliveryPostalCode}
+                      onChange={(event) => setDeliveryPostalCode(event.target.value)}
+                      required
+                      autoComplete="postal-code"
                       className={field}
                     />
                   </label>

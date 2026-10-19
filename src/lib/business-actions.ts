@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
 import { saveAgentWebhook } from "@/lib/agent";
 import { saveTextSettings } from "@/lib/messaging";
-import { setSlackConnection } from "@/lib/businesses";
+import { setPublicOrigin, setSlackConnection } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
 
 function field(formData: FormData, key: string) {
@@ -20,15 +20,16 @@ export async function saveAgentWebhookAction(formData: FormData) {
   const business = await currentBusiness();
   await requireSession();
   try {
+    setPublicOrigin(business.id, field(formData, "publicOrigin"));
     saveAgentWebhook(business.id, field(formData, "webhookUrl"));
   } catch (error) {
-    bounce("/terminal/agent", error instanceof Error ? error.message : "Could not save the n8n webhook.");
+    bounce("/terminal/agent", error instanceof Error ? error.message : "Could not save agent settings.");
   }
   revalidatePath("/terminal/agent");
   const connected = field(formData, "webhookUrl").length > 0;
   const message = connected
-    ? "n8n will receive a trigger each time the menu changes."
-    : "Menu updates will stay on this desk until an n8n webhook is saved.";
+    ? "Public site URL and n8n webhook saved. Menu texts keep using that public URL."
+    : "Public site URL saved. Menu updates stay on this desk until an n8n webhook is saved.";
   redirect(`/terminal/agent?saved=${encodeURIComponent(message)}`);
 }
 
