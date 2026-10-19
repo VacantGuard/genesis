@@ -36,6 +36,7 @@ export function PublicSite({
   const [cardNumber, setCardNumber] = useState("");
   const [expiry, setExpiry] = useState("");
   const [cvc, setCvc] = useState("");
+  const [smsOptIn, setSmsOptIn] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -89,6 +90,7 @@ export function PublicSite({
           email,
           companyName,
           notes,
+          smsOptIn,
           businessSlug,
           card: { name: cardName, number: cardNumber, expiry, cvc },
           lines: lines.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity })),
@@ -266,6 +268,9 @@ export function PublicSite({
                 <p className="mt-3 text-sm text-muted-foreground">
                   {confirmation.customerName}, your meal order is paid. Card ending {confirmation.last4}.
                   This was a practice payment.
+                  {smsOptIn
+                    ? ` You are enrolled in ${profile.name} menu texts. A confirmation text welcomes you to the program. Reply STOP to opt out or HELP for help.`
+                    : ""}
                 </p>
                 <ul className="mt-4 grid gap-1 text-sm">
                   {confirmation.items.map((item) => (
@@ -391,6 +396,28 @@ export function PublicSite({
                     {error}
                   </p>
                 ) : null}
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="smsOptIn"
+                    checked={smsOptIn}
+                    onChange={(event) => setSmsOptIn(event.target.checked)}
+                    className="mt-1 size-4"
+                  />
+                  <span>
+                    I agree to receive weekly menu texts from {profile.name}. About one to four
+                    messages a week. Message and data rates may apply. Reply STOP to opt out or HELP
+                    for help. This box is optional and is not required to place an order. See the{" "}
+                    <Link href="/privacy" className="underline">
+                      Privacy Policy
+                    </Link>{" "}
+                    and{" "}
+                    <Link href="/terms" className="underline">
+                      Terms
+                    </Link>
+                    .
+                  </span>
+                </label>
                 <Button type="submit" disabled={pending || lines.length === 0} className="mt-2 h-11">
                   {pending ? "Recording payment…" : `Pay ${formatMoney(total)}`}
                 </Button>
@@ -407,9 +434,17 @@ export function PublicSite({
       <footer className="border-t">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-muted-foreground">
           <p>{profile.name}</p>
-          <Link href="/terminal" className="hover:text-foreground">
-            Staff terminal
-          </Link>
+          <span className="flex gap-4">
+            <Link href="/privacy" className="hover:text-foreground">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:text-foreground">
+              Terms
+            </Link>
+            <Link href="/terminal" className="hover:text-foreground">
+              Staff terminal
+            </Link>
+          </span>
         </div>
       </footer>
 

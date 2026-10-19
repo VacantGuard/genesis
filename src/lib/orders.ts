@@ -38,14 +38,18 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
       priced.push({ name: item.name, quantity: line.quantity, unitPriceCents: item.priceCents });
     }
 
+    const orderColumns = db.prepare("PRAGMA table_info(orders)").all() as { name: string }[];
+    if (!orderColumns.some((column) => column.name === "sms_opt_in")) {
+      db.exec("ALTER TABLE orders ADD COLUMN sms_opt_in INTEGER NOT NULL DEFAULT 0");
+    }
     const totalCents = priced.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0);
     const orderNumber = nextOrderNumber(db);
     const createdAt = new Date().toISOString();
     const inserted = db
       .prepare(
         `INSERT INTO orders
-          (order_number, customer_name, phone, email, company_name, notes, card_last4, total_cents, status, created_at, business_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?)`,
+          (order_number, customer_name, phone, email, company_name, notes, card_last4, total_cents, status, created_at, business_id, sms_opt_in)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?)`,
       )
       .run(
         orderNumber,
@@ -58,6 +62,7 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
         totalCents,
         createdAt,
         businessId,
+        input.smsOptIn ? 1 : 0,
       );
     const orderId = Number(inserted.lastInsertRowid);
     const insertItem = db.prepare(

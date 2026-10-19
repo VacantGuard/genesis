@@ -14,6 +14,7 @@ type Body = {
   email?: string;
   companyName?: string;
   notes?: string;
+  smsOptIn?: boolean;
   card?: { number?: string; expiry?: string; cvc?: string; name?: string };
   lines?: { menuItemId?: number; quantity?: number }[];
 };
@@ -81,6 +82,7 @@ export async function POST(request: Request) {
       email,
       companyName,
       notes,
+      smsOptIn: body.smsOptIn === true,
       cardLast4: card.last4,
       lines: [...merged.entries()].map(([menuItemId, quantity]) => ({ menuItemId, quantity })),
     });

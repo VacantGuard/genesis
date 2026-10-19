@@ -18,6 +18,7 @@ export type NewOrderInput = {
   notes: string;
   cardLast4: string;
   lines: OrderLineInput[];
+  smsOptIn?: boolean;
 };
 
 const globalForDb = globalThis as unknown as {
