@@ -69,8 +69,13 @@ function loadLocalEnv() {
   }
 }
 
+function dataDir() {
+  if (process.env.VERCEL) return "/tmp/kitchen-data";
+  return path.join(process.cwd(), "data");
+}
+
 function databasePath() {
-  return process.env.DATABASE_PATH || path.join(process.cwd(), "data", "kitchen.sqlite");
+  return process.env.DATABASE_PATH || path.join(dataDir(), "kitchen.sqlite");
 }
 
 export function tursoConfig() {
@@ -293,7 +298,7 @@ function openDatabase() {
   const turso = tursoConfig();
   let db: Database.Database;
   if (turso) {
-    const file = path.join(process.cwd(), "data", "turso-replica.db");
+    const file = path.join(dataDir(), "turso-replica.db");
     fs.mkdirSync(path.dirname(file), { recursive: true });
     db = new Database(file, { syncUrl: turso.url, authToken: turso.token } as Database.Options);
     db.sync();
