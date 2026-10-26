@@ -15,7 +15,6 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: "TigEats",
   description: "Weekly meal prep menu, order payment, and a staff terminal.",
-  icons: { icon: "/tigeats-logo.svg" },
 };
 
 export default function RootLayout({

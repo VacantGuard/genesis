@@ -147,9 +147,7 @@ export function PublicSite({
     <div className="min-h-screen bg-white pb-16 text-[#171a20] md:pb-0">
       <header className="fixed inset-x-0 top-0 z-30 bg-[#171a20]/80 text-white backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
-          <a href="#top" className="flex items-center gap-2 text-sm font-medium tracking-wide">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/tigeats-logo.jpg" alt="" width={28} height={28} className="rounded-sm object-cover" />
+          <a href="#top" className="text-sm font-medium tracking-wide">
             {profile.name}
           </a>
           <nav className="flex items-center gap-6 text-sm font-medium">
@@ -171,15 +169,7 @@ export function PublicSite({
 
       <main id="top">
         <section className="flex min-h-[100svh] flex-col items-center justify-end bg-[#171a20] px-6 pb-24 pt-20 text-center text-white">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/tigeats-logo.jpg"
-            alt=""
-            width={96}
-            height={96}
-            className="rounded-lg bg-white object-cover shadow-sm"
-          />
-          <h1 className="mt-6 text-5xl font-medium tracking-tight sm:text-7xl">{profile.name}</h1>
+          <h1 className="text-5xl font-medium tracking-tight sm:text-7xl">{profile.name}</h1>
           <p className="mt-3 max-w-md text-sm text-white/80">
             Portioned meals for the week. Order here for delivery.
           </p>
