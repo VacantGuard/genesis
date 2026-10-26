@@ -7,12 +7,12 @@ export default function PrivacyPage() {
   return (
     <main className="mx-auto grid max-w-2xl gap-4 bg-white px-6 py-20 text-sm leading-7 text-[#171a20]">
       <h1 className="font-heading text-4xl tracking-tight">Privacy Policy</h1>
-      <p>This policy is for North Bowl, the brand registered for these text messages.</p>
+      <p>This policy is for TigEats, the brand registered for these text messages.</p>
       <p>
-        When you place a pickup order, North Bowl collects your name, mobile number, email, optional
-        company name, optional prep notes, and the last four digits of the card used for the practice
-        payment. North Bowl uses that information to prepare the order, send a receipt, and, only if
-        you check the menu-text box, send the weekly menu and menu updates you asked for.
+        When you place a delivery order, TigEats collects your name, mobile number, email, optional
+        company name, delivery address, optional prep notes, and the last four digits of the card used
+        for the practice payment. TigEats uses that information to prepare the order, send a receipt,
+        and, only if you check the menu-text box, send the weekly menu and menu updates you asked for.
       </p>
       <p>You may receive up to 4 messages per week. Message and data rates may apply.</p>
       <p>You can reply STOP to opt out or HELP for help.</p>
@@ -22,7 +22,7 @@ export default function PrivacyPage() {
         marketing purposes.
       </p>
       <p>
-        <Link href="/b/north-bowl#pos" className="underline">
+        <Link href="/b/tigeats#pos" className="underline">
           Back to the order form
         </Link>
       </p>

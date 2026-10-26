@@ -1,5 +1,5 @@
 import { getDb } from "./db.ts";
-import { SAMPLE_ABOUT, SAMPLE_NAME } from "./seed.ts";
+import { SAMPLE_ABOUT, SAMPLE_NAME, SAMPLE_SLUG } from "./seed.ts";
 
 export type BusinessRecord = {
   id: number;
@@ -86,7 +86,17 @@ export function initTenancy() {
   }
 }
 
-export function keepSampleAsNorthBowl(db: ReturnType<typeof getDb>) {
+function isLegacySampleBrand(name: string, about: string) {
+  return (
+    name === "Hearth Prep" ||
+    name === "North Bowl" ||
+    about.startsWith("Hearth Prep is sample copy") ||
+    about.startsWith("North Bowl is sample copy")
+  );
+}
+
+/** Keep the homepage sample business on the current product brand (TigEats). */
+export function keepSampleBrand(db: ReturnType<typeof getDb>) {
   const extras = db
     .prepare(
       `SELECT id FROM businesses
@@ -105,20 +115,28 @@ export function keepSampleAsNorthBowl(db: ReturnType<typeof getDb>) {
   const home = db
     .prepare("SELECT id, name, about FROM businesses WHERE is_homepage = 1 LIMIT 1")
     .get() as { id: number; name: string; about: string } | undefined;
-  if (!home || (home.name !== "Hearth Prep" && !home.about.startsWith("Hearth Prep is sample copy"))) return;
+  if (!home || !isLegacySampleBrand(home.name, home.about)) return;
 
   const now = new Date().toISOString();
   db.prepare("UPDATE businesses SET name = ?, slug = ?, about = ?, updated_at = ? WHERE id = ?").run(
     SAMPLE_NAME,
-    uniqueSlug(db, "north-bowl", home.id),
+    uniqueSlug(db, SAMPLE_SLUG, home.id),
     SAMPLE_ABOUT,
     now,
     home.id,
   );
   db.prepare(
-    "UPDATE business_profile SET name = ?, about = ?, updated_at = ? WHERE id = 1 AND (name = 'Hearth Prep' OR about LIKE 'Hearth Prep is sample copy%')",
+    `UPDATE business_profile SET name = ?, about = ?, updated_at = ?
+     WHERE id = 1 AND (
+       name IN ('Hearth Prep', 'North Bowl')
+       OR about LIKE 'Hearth Prep is sample copy%'
+       OR about LIKE 'North Bowl is sample copy%'
+     )`,
   ).run(SAMPLE_NAME, SAMPLE_ABOUT, now);
 }
+
+/** @deprecated Use keepSampleBrand */
+export const keepSampleAsNorthBowl = keepSampleBrand;
 
 function uniqueSlug(db: ReturnType<typeof getDb>, base: string, exceptId?: number) {
   let slug = base;

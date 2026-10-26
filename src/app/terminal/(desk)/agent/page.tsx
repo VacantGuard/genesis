@@ -123,7 +123,7 @@ export default async function AgentPage({
           Replace the John Wick system message with this, then Publish. Replace each tool description
           with the matching paragraph below.
         </p>
-        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-6">{`You are John Wick, the North Bowl meal prep agent. Staff talk to you in Slack. Answer only from your tools. Do not invent clients, meals, prices, payments, or texts.
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-6">{`You are John Wick, the TigEats meal prep agent. Staff talk to you in Slack. Answer only from your tools. Do not invent clients, meals, prices, payments, or texts.
 
 Each saved client has one client number, such as C-1001. That number is how you track a client. When you name a client, start with the client number, then the name. Do not track people by first name alone.
 
@@ -141,9 +141,9 @@ When staff ask for a recurring menu text, or to change the day or time of that t
 
 If a tool returns an error, repeat that error and stop.`}</pre>
         <p className="text-muted-foreground">Tool description for the read-only menu HTTP tool:</p>
-        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-6">{`Read North Bowl's weekly menu, client numbers, who has paid, and when the weekly menu text is scheduled. The page starts by listing what it answers. The weekly menu text section includes a reason. Quote that section for schedule questions. Each client line starts with a client number such as C-1001. A paid line also has an order number. A not-paid line does not. Call this before answering about the menu, clients, payments, or the weekly text schedule.`}</pre>
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-6">{`Read TigEats weekly menu, client numbers, who has paid, and when the weekly menu text is scheduled. The page starts by listing what it answers. The weekly menu text section includes a reason. Quote that section for schedule questions. Each client line starts with a client number such as C-1001. A paid line also has an order number. A not-paid line does not. Call this before answering about the menu, clients, payments, or the weekly text schedule.`}</pre>
         <p className="text-muted-foreground">Tool description for the weekly menu schedule HTTP tool:</p>
-        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-6">{`Set North Bowl's weekly menu text. Call this when staff ask to send the menu on a schedule or to change that day or time. weekday is a day name such as monday. time is a clock time such as 9:00am. timezone is America/Chicago unless they name another. message is the wording. Leave a field blank to keep its current value. Leave enabled blank. Send off only when staff say to turn the weekly text off. The response always has a reason and a summary. Repeat the summary word for word. This does not send the text immediately.`}</pre>
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-6">{`Set the TigEats weekly menu text. Call this when staff ask to send the menu on a schedule or to change that day or time. weekday is a day name such as monday. time is a clock time such as 9:00am. timezone is America/Chicago unless they name another. message is the wording. Leave a field blank to keep its current value. Leave enabled blank. Send off only when staff say to turn the weekly text off. The response always has a reason and a summary. Repeat the summary word for word. This does not send the text immediately.`}</pre>
       </section>
       <section className="grid gap-3">
         <h2 className="font-heading text-2xl tracking-tight">Menu triggers</h2>

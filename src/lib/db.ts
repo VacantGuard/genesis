@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import Database from "libsql";
-import { initTenancy, keepSampleAsNorthBowl } from "./businesses.ts";
+import { initTenancy, keepSampleBrand } from "./businesses.ts";
 import { reframeLegacyLunchSample, seed } from "./seed.ts";
 
 export class OrderError extends Error {}
@@ -353,7 +353,7 @@ export function getDb() {
   if (opening) return globalForDb.kitchenDb;
   if (!globalForDb.maintenanceDone) {
     reframeLegacyLunchSample(globalForDb.kitchenDb);
-    keepSampleAsNorthBowl(globalForDb.kitchenDb);
+    keepSampleBrand(globalForDb.kitchenDb);
     globalForDb.maintenanceDone = true;
   }
   return globalForDb.kitchenDb;

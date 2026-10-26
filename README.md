@@ -89,7 +89,7 @@ The agent you talk to in Slack runs in n8n. On the staff Agent page, paste the n
 
 The first launch inserts sample content you can edit or delete:
 
-- Business name **North Bowl** and about copy for a meal prep kitchen
+- Business name **TigEats** and about copy for a meal prep kitchen
 - A weekly portioned menu (breakfasts, mains, sides) with one sold-out meal
 - Company **Sample Studio Co.** and three sample customers (555 numbers and `.example` emails)
 
