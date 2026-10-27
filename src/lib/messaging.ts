@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { getDb } from "./db.ts";
 import { TEXT_PLATFORMS, type TextPlatform } from "./text-platforms.ts";
 
@@ -149,12 +150,61 @@ async function readError(response: Response) {
   return json.message || json.detail || json.error || `The text platform returned ${response.status}.`;
 }
 
-export async function sendTextMessage(credentials: TextCredentials, to: string, body: string) {
+export type TextDelivery = "accepted" | "delivered" | "sent" | "failed";
+
+/** Twilio's create call returns queued/sent before the handset confirms delivery. */
+export function twilioDeliveryStatus(status: string | undefined): Exclude<TextDelivery, "sent"> {
+  const value = (status || "").toLowerCase();
+  if (value === "delivered" || value === "read") return "delivered";
+  if (value === "failed" || value === "undelivered" || value === "canceled") return "failed";
+  return "accepted";
+}
+
+export function textStatusCallbackUrl(origin: string | undefined) {
+  if (!origin) return "";
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== "https:") return "";
+    if (url.hostname === "tigeats.com") url.hostname = "www.tigeats.com";
+    return `${url.origin}/api/twilio/status`;
+  } catch {
+    return "";
+  }
+}
+
+export function twilioSignatureMatches(url: string, params: URLSearchParams, header: string, token: string) {
+  if (!header || !token) return false;
+  const entries = [...params.entries()].sort(([left], [right]) => left.localeCompare(right));
+  let payload = url;
+  for (const [key, value] of entries) payload += key + value;
+  const expected = createHmac("sha1", token).update(payload).digest("base64");
+  const actual = Buffer.from(header);
+  const expectedBuffer = Buffer.from(expected);
+  return actual.length === expectedBuffer.length && timingSafeEqual(actual, expectedBuffer);
+}
+
+export function textOutcomeLabel(status: string) {
+  if (status === "delivered") return "delivered";
+  if (status === "failed" || status === "undelivered") return "failed";
+  if (status === "logged") return "logged";
+  if (status === "sent" || status === "accepted" || status === "queued" || status === "sending") {
+    return "accepted, not delivered";
+  }
+  return status;
+}
+
+export async function sendTextMessage(
+  credentials: TextCredentials,
+  to: string,
+  body: string,
+  statusCallback?: string,
+) {
   const destination = toE164(to);
-  if (!destination) return { ok: false as const, detail: unusableNumber(to) };
+  if (!destination) return { ok: false as const, detail: unusableNumber(to), delivery: "failed" as const };
   try {
     if (credentials.platform === "twilio") {
       const payload = new URLSearchParams({ To: destination, From: credentials.fromNumber, Body: body });
+      if (statusCallback) payload.set("StatusCallback", statusCallback);
       const response = await fetch(
         `https://api.twilio.com/2010-04-01/Accounts/${credentials.accountId}/Messages.json`,
         {
@@ -167,9 +217,24 @@ export async function sendTextMessage(credentials: TextCredentials, to: string, 
           signal: AbortSignal.timeout(12000),
         },
       );
-      if (!response.ok) return { ok: false as const, detail: await readError(response) };
-      const json = (await response.json()) as { sid?: string };
-      return { ok: true as const, detail: json.sid || "sent" };
+      const json = (await response.json()) as {
+        sid?: string;
+        status?: string;
+        message?: string;
+        error_message?: string | null;
+      };
+      if (!response.ok) {
+        return { ok: false as const, detail: json.message || json.error_message || `Twilio returned ${response.status}.`, delivery: "failed" as const };
+      }
+      const delivery = twilioDeliveryStatus(json.status);
+      if (delivery === "failed") {
+        return {
+          ok: false as const,
+          detail: json.error_message || json.message || "Twilio rejected the text before delivery.",
+          delivery,
+        };
+      }
+      return { ok: true as const, detail: json.sid || delivery, delivery };
     }
     if (credentials.platform === "simpletexting") {
       const response = await fetch("https://api-app2.simpletexting.com/v2/api/messages", {
@@ -186,9 +251,9 @@ export async function sendTextMessage(credentials: TextCredentials, to: string, 
         }),
         signal: AbortSignal.timeout(12000),
       });
-      if (!response.ok) return { ok: false as const, detail: await readError(response) };
+      if (!response.ok) return { ok: false as const, detail: await readError(response), delivery: "failed" as const };
       const json = (await response.json().catch(() => ({}))) as { id?: string };
-      return { ok: true as const, detail: json.id || "sent" };
+      return { ok: true as const, detail: json.id || "sent", delivery: "sent" as const };
     }
     const response = await fetch("https://api.sendblue.com/api/send-message", {
       method: "POST",
@@ -211,10 +276,15 @@ export async function sendTextMessage(credentials: TextCredentials, to: string, 
       return {
         ok: false as const,
         detail: json.error_message || json.message || json.error || `Sendblue returned ${response.status}.`,
+        delivery: "failed" as const,
       };
     }
-    return { ok: true as const, detail: json.message_handle || json.status || "sent" };
+    return { ok: true as const, detail: json.message_handle || json.status || "sent", delivery: "sent" as const };
   } catch (error) {
-    return { ok: false as const, detail: error instanceof Error ? error.message : "The text platform could not be reached." };
+    return {
+      ok: false as const,
+      detail: error instanceof Error ? error.message : "The text platform could not be reached.",
+      delivery: "failed" as const,
+    };
   }
 }

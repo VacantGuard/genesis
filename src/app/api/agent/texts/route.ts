@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { businessForAgentToken } from "@/lib/agent";
 import { menuLink, rememberPublicOrigin } from "@/lib/businesses";
+import { textStatusCallbackUrl } from "@/lib/messaging";
 import { publicOrigin } from "@/lib/menu-memory";
 import { sendCampaign } from "@/lib/texts";
 
@@ -32,12 +33,14 @@ export async function POST(request: Request) {
   }
 
   try {
+    const origin = publicOrigin(request);
     const result = await sendCampaign({
       businessId: business.id,
       message,
-      linkUrl: menuLink(business.slug, publicOrigin(request)),
+      linkUrl: menuLink(business.slug, origin),
       includeCustomers,
       includeCompanyContacts,
+      statusCallbackUrl: textStatusCallbackUrl(origin),
     });
     return NextResponse.json({
       business: business.name,

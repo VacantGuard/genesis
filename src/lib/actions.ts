@@ -19,6 +19,7 @@ import {
   saveCustomer,
 } from "@/lib/directory";
 import { OrderError } from "@/lib/db";
+import { textStatusCallbackUrl } from "@/lib/messaging";
 import { parseDollarsToCents } from "@/lib/format";
 import {
   createCategory,
@@ -312,6 +313,7 @@ export async function sendCampaignAction(input: {
       linkUrl,
       includeCustomers: input.includeCustomers,
       includeCompanyContacts: input.includeCompanyContacts,
+      statusCallbackUrl: textStatusCallbackUrl(`${proto}://${host}`),
     });
     revalidatePath("/terminal/campaigns");
     return {

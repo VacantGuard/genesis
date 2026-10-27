@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { menuLink, rememberedOrigin } from "./businesses";
+import { textStatusCallbackUrl } from "./messaging";
 import { sendCampaign } from "./texts";
 
 export const MENU_TEXT_WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
@@ -178,12 +179,14 @@ export async function sendDueMenuTexts(now = new Date()) {
     if (!scheduleIsDue(schedule, now)) continue;
     const local = localStamp(now, schedule.timezone);
     getDb().prepare("UPDATE businesses SET menu_text_last_sent = ? WHERE id = ?").run(local.date, business.id);
+    const origin = rememberedOrigin(business.id) || undefined;
     const result = await sendCampaign({
       businessId: business.id,
       message: schedule.message,
-      linkUrl: menuLink(business.slug, rememberedOrigin(business.id) || undefined),
+      linkUrl: menuLink(business.slug, origin),
       includeCustomers: true,
       includeCompanyContacts: false,
+      statusCallbackUrl: textStatusCallbackUrl(origin),
     });
     sent.push({ businessId: business.id, recipientCount: result.recipientCount });
   }

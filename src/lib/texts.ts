@@ -14,7 +14,7 @@ export type CampaignRecipient = {
   clientNumber: string;
   name: string;
   phone: string;
-  status: "logged" | "sent" | "failed";
+  status: "logged" | "accepted" | "sent" | "delivered" | "failed";
   detail: string;
 };
 
@@ -28,6 +28,7 @@ export async function sendCampaign(input: {
   linkUrl: string;
   includeCustomers: boolean;
   includeCompanyContacts: boolean;
+  statusCallbackUrl?: string;
 }) {
   const db = getDb();
   const recipients: SmsRecipient[] = [];
@@ -113,8 +114,8 @@ export async function sendCampaign(input: {
   for (let index = 0; index < recorded.ids.length; index += 1) {
     const row = recorded.ids[index];
     const recipient = recipients[index];
-    const result = await sendTextMessage(credentials, row.phone, body);
-    const status = result.ok ? "sent" : "failed";
+    const result = await sendTextMessage(credentials, row.phone, body, input.statusCallbackUrl);
+    const status = result.delivery;
     if (result.ok) sentCount += 1;
     else failedCount += 1;
     mark.run(status, result.detail, row.id);

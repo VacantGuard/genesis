@@ -8,7 +8,7 @@ import { currentBusiness } from "@/lib/current-business";
 import { listCompanies, listCustomers } from "@/lib/directory";
 import { formatWhen } from "@/lib/format";
 import { menuLink, rememberedOrigin } from "@/lib/businesses";
-import { textSettings } from "@/lib/messaging";
+import { textOutcomeLabel, textSettings } from "@/lib/messaging";
 import { getMenuTextSchedule, scheduleReport } from "@/lib/menu-schedule";
 import { listCampaigns } from "@/lib/texts";
 
@@ -50,6 +50,7 @@ export default async function CampaignsPage({
         companies={companies}
         menuUrl={menuUrl}
         textingReady={textingReady}
+        platform={texting.platform}
       />
 
       <section className="grid gap-3">
@@ -75,7 +76,7 @@ export default async function CampaignsPage({
               <ul className="grid gap-1 text-sm text-muted-foreground">
                 {campaign.deliveries.map((delivery) => (
                   <li key={delivery.id}>
-                    {delivery.recipientName} · {delivery.phone} · {delivery.status}
+                    {delivery.recipientName} · {delivery.phone} · {textOutcomeLabel(delivery.status)}
                     {delivery.detail ? ` · ${delivery.detail}` : ""}
                   </li>
                 ))}

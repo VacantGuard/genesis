@@ -12,11 +12,13 @@ export function CampaignComposer({
   companies,
   menuUrl,
   textingReady,
+  platform,
 }: {
   customers: Customer[];
   companies: Company[];
   menuUrl: string;
   textingReady: boolean;
+  platform: string;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState(
@@ -68,12 +70,17 @@ export function CampaignComposer({
       return;
     }
     const noun = result.recipientCount === 1 ? "text" : "texts";
+    const who = platform === "twilio" ? "Twilio" : "The text platform";
     if (result.mode === "logged") {
       setStatus(`Logged ${result.recipientCount} ${noun}. Connect a text platform above before a phone can receive them.`);
     } else if (result.failedCount > 0) {
-      setStatus(`Sent ${result.sentCount}. ${result.failedCount} failed. The reason is in the history below.`);
+      setStatus(
+        `${who} accepted ${result.sentCount}. ${result.failedCount} failed before acceptance. Accepted is not delivery to the phone. The reason is in the history below.`,
+      );
     } else {
-      setStatus(`Sent ${result.sentCount} ${noun} with ${result.linkUrl}.`);
+      setStatus(
+        `${who} accepted ${result.sentCount} ${noun}. That is not delivery to the phone. The history stays “accepted, not delivered” until the platform reports the phone.`,
+      );
     }
     router.refresh();
   }
