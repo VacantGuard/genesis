@@ -29,8 +29,9 @@ export type CustomerOrder = {
   items: string;
 };
 
-function ensureAccounts() {
-  getDb().exec(`
+export function ensureAccounts() {
+  const db = getDb();
+  db.exec(`
     CREATE TABLE IF NOT EXISTS customer_accounts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       business_id INTEGER NOT NULL,
@@ -41,19 +42,27 @@ function ensureAccounts() {
       UNIQUE (business_id, email)
     );
   `);
+  const columns = db.prepare("PRAGMA table_info(customer_accounts)").all() as { name: string }[];
+  const names = new Set(columns.map((column) => column.name));
+  if (!names.has("reset_code_hash")) {
+    db.exec("ALTER TABLE customer_accounts ADD COLUMN reset_code_hash TEXT NOT NULL DEFAULT ''");
+  }
+  if (!names.has("reset_expires_at")) {
+    db.exec("ALTER TABLE customer_accounts ADD COLUMN reset_expires_at TEXT NOT NULL DEFAULT ''");
+  }
 }
 
 function digits(phone: string) {
   return phone.replace(/\D/g, "");
 }
 
-function hashPassword(password: string) {
+export function hashPassword(password: string) {
   const salt = randomBytes(16).toString("base64url");
   const hash = scryptSync(password, salt, 32).toString("base64url");
   return `${salt}.${hash}`;
 }
 
-function checkPassword(password: string, stored: string) {
+export function checkPassword(password: string, stored: string) {
   const [salt, hash] = stored.split(".");
   if (!salt || !hash) return false;
   const actual = scryptSync(password, salt, 32);
@@ -89,7 +98,7 @@ function read(token: string | undefined | null): SessionPayload | null {
   }
 }
 
-async function writeCookie(accountId: number) {
+export async function writeCookie(accountId: number) {
   const jar = await cookies();
   jar.set(COOKIE, sign(accountId), {
     httpOnly: true,

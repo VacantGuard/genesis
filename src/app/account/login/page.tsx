@@ -24,7 +24,10 @@ export default async function CustomerLoginPage() {
           Continue without signing in
         </button>
       </form>
-      <Link href="/account/signup" className="mt-6 text-sm underline">
+      <Link href="/account/reset" className="mt-6 text-sm underline">
+        Forgot password
+      </Link>
+      <Link href="/account/signup" className="mt-3 text-sm underline">
         Create an account
       </Link>
       <Link href="/" className="mt-3 text-sm text-[#5c5e62]">
