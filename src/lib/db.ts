@@ -35,7 +35,7 @@ const globalForDb = globalThis as unknown as {
   tenancyReady?: boolean;
   envLoaded?: boolean;
   maintenanceDone?: boolean;
-  syncTimer?: ReturnType<typeof setTimeout>;
+  lastTursoSync?: number;
 };
 
 let opening = false;
@@ -282,16 +282,20 @@ function stripMetadata<T>(value: T): T {
   return value;
 }
 
-function scheduleSync(db: Database.Database) {
-  if (opening || !tursoConfig()) return;
-  if (globalForDb.syncTimer) clearTimeout(globalForDb.syncTimer);
-  globalForDb.syncTimer = setTimeout(() => {
-    try {
-      db.sync();
-    } catch (error) {
-      console.error("Turso sync failed", error);
-    }
-  }, 200);
+function pushTurso(db: Database.Database) {
+  if (opening || !tursoConfig() || db.inTransaction) return;
+  try {
+    db.sync();
+    globalForDb.lastTursoSync = Date.now();
+  } catch (error) {
+    console.error("Turso sync failed", error);
+  }
+}
+
+function pullTurso(db: Database.Database) {
+  if (opening || !tursoConfig() || db.inTransaction) return;
+  if (Date.now() - (globalForDb.lastTursoSync ?? 0) < 1000) return;
+  pushTurso(db);
 }
 
 function openDatabase() {
@@ -312,7 +316,7 @@ function openDatabase() {
   const exec = db.exec.bind(db);
   db.exec = (source: string) => {
     const result = exec(source);
-    scheduleSync(db);
+    pushTurso(db);
     return result;
   };
   const prepare = db.prepare.bind(db);
@@ -325,11 +329,22 @@ function openDatabase() {
     statement.all = (...params: unknown[]) => stripMetadata(all(...params));
     statement.run = (...params: unknown[]) => {
       const result = run(...params);
-      scheduleSync(db);
+      pushTurso(db);
       return result;
     };
     return statement;
   }) as Database.Database["prepare"];
+  const transaction = db.transaction.bind(db);
+  db.transaction = ((fn: (...args: unknown[]) => unknown) => {
+    const wrapped = transaction(fn as never) as unknown as (...args: unknown[]) => unknown;
+    return (...args: unknown[]) => {
+      try {
+        return wrapped(...args);
+      } finally {
+        pushTurso(db);
+      }
+    };
+  }) as unknown as Database.Database["transaction"];
   return db;
 }
 
@@ -348,9 +363,11 @@ export function getDb() {
     } finally {
       opening = false;
     }
+    if (globalForDb.kitchenDb) pushTurso(globalForDb.kitchenDb);
   }
   if (!globalForDb.kitchenDb) throw new Error("Kitchen database failed to open");
   if (opening) return globalForDb.kitchenDb;
+  pullTurso(globalForDb.kitchenDb);
   if (!globalForDb.maintenanceDone) {
     reframeLegacyLunchSample(globalForDb.kitchenDb);
     keepSampleBrand(globalForDb.kitchenDb);

@@ -136,7 +136,15 @@ export function updateMenuItem(input: {
       input.id,
       input.businessId,
     );
-  return result.changes > 0;
+  if (result.changes > 0) return true;
+  const row = db
+    .prepare(
+      `SELECT id FROM menu_items
+       WHERE id = ?
+         AND category_id IN (SELECT id FROM menu_categories WHERE business_id = ?)`,
+    )
+    .get(input.id, input.businessId);
+  return Boolean(row);
 }
 
 export function setMenuItemAvailability(businessId: number, id: number, available: boolean) {
