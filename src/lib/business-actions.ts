@@ -7,6 +7,7 @@ import { saveAgentWebhook } from "@/lib/agent";
 import { saveTextSettings } from "@/lib/messaging";
 import { setPublicOrigin, setSlackConnection } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
+import { saveStripeSettings } from "@/lib/stripe";
 
 function field(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -52,6 +53,29 @@ export async function saveTextPlatformAction(formData: FormData) {
     ? "Text platform saved. Campaigns send through that account."
     : "Text platform disconnected. Campaigns stay in the log until you connect one again.";
   redirect(`/terminal/campaigns?saved=${encodeURIComponent(message)}`);
+}
+
+export async function saveStripeAction(formData: FormData) {
+  const business = await currentBusiness();
+  await requireSession();
+  const disconnect = field(formData, "intent") === "disconnect";
+  try {
+    saveStripeSettings(business.id, {
+      publishableKey: field(formData, "publishableKey"),
+      secretKey: field(formData, "secretKey"),
+      webhookSecret: field(formData, "webhookSecret"),
+      disconnect,
+    });
+  } catch (error) {
+    bounce("/terminal/profile", error instanceof Error ? error.message : "Could not save Stripe.");
+  }
+  revalidatePath("/terminal/profile");
+  revalidatePath("/");
+  revalidatePath(`/b/${business.slug}`);
+  const message = disconnect
+    ? "Stripe is disconnected. Customer checkout will not charge a card."
+    : "Stripe is connected. Customer checkout charges cards for this business.";
+  redirect(`/terminal/profile?saved=${encodeURIComponent(message)}`);
 }
 
 export async function saveSlackAction(formData: FormData) {

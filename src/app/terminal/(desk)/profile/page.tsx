@@ -1,9 +1,13 @@
+import { headers } from "next/headers";
 import { Flash } from "@/components/flash";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { saveProfileAction } from "@/lib/actions";
+import { rememberedOrigin } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
+import { saveStripeAction } from "@/lib/business-actions";
+import { stripeSettings } from "@/lib/stripe";
 
 export default async function ProfilePage({
   searchParams,
@@ -12,6 +16,13 @@ export default async function ProfilePage({
 }) {
   const query = await searchParams;
   const profile = await currentBusiness();
+  const stripe = stripeSettings(profile.id);
+  const headerStore = await headers();
+  const host = headerStore.get("x-forwarded-host") || headerStore.get("host") || "";
+  const local = host.startsWith("localhost") || host.startsWith("127.0.0.1");
+  const proto = headerStore.get("x-forwarded-proto") || (local ? "http" : "https");
+  const origin = rememberedOrigin(profile.id) || (host ? `${proto}://${host}` : "");
+  const webhookUrl = `${origin}/api/stripe/webhook`;
 
   return (
     <>
@@ -36,6 +47,76 @@ export default async function ProfilePage({
           <Button type="submit">Save profile</Button>
         </div>
       </form>
+
+      <section className="grid max-w-2xl gap-3 border-t pt-6">
+        <h2 className="font-heading text-2xl tracking-tight">Stripe</h2>
+        <p className="text-sm text-muted-foreground">
+          This is how {profile.name} takes card payments. Customer checkout on the public menu charges
+          the card through this Stripe account, then the paid order shows on Orders.
+        </p>
+        {stripe.connected ? (
+          <p className="text-sm font-medium">Stripe is connected.</p>
+        ) : (
+          <div className="text-sm">
+            <p>Stripe is not connected. Add these before a customer card can be charged:</p>
+            <ul className="mt-2 list-disc pl-5">
+              {stripe.missing.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <form action={saveStripeAction} className="grid gap-3">
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">Publishable key</span>
+            <Input
+              name="publishableKey"
+              defaultValue={stripe.publishableKey}
+              placeholder="pk_live_ or pk_test_"
+              autoComplete="off"
+              className="h-10 bg-card"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">Secret key</span>
+            <Input
+              name="secretKey"
+              type="password"
+              placeholder={stripe.hasSecret ? "Saved. Paste a new secret key to replace it." : "sk_live_ or sk_test_"}
+              autoComplete="new-password"
+              className="h-10 bg-card"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">Webhook secret</span>
+            <Input
+              name="webhookSecret"
+              type="password"
+              placeholder={
+                stripe.hasWebhookSecret ? "Saved. Paste a new webhook secret to replace it." : "whsec_"
+              }
+              autoComplete="new-password"
+              className="h-10 bg-card"
+            />
+          </label>
+          <p className="text-sm text-muted-foreground">
+            In Stripe, add an endpoint for {webhookUrl} and use the payment_intent.succeeded event. The
+            secret from that endpoint is the webhook secret. Secret keys stay on this business and are
+            not shown again.
+          </p>
+          <div>
+            <Button type="submit">Save Stripe</Button>
+          </div>
+        </form>
+        {stripe.connected ? (
+          <form action={saveStripeAction}>
+            <input type="hidden" name="intent" value="disconnect" />
+            <Button type="submit" variant="outline">
+              Disconnect Stripe
+            </Button>
+          </form>
+        ) : null}
+      </section>
     </>
   );
 }

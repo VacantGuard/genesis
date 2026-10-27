@@ -3,6 +3,7 @@ import { PublicSite } from "@/components/public-site";
 import { currentCustomer } from "@/lib/customer-auth";
 import { getBusinessBySlug } from "@/lib/businesses";
 import { getPublicMenu } from "@/lib/menu";
+import { stripePublishableKey } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,6 +30,7 @@ export default async function BusinessMenuPage({ params }: { params: Promise<{ s
       menu={menu}
       businessSlug={business.slug}
       accountName={account && account.businessId === business.id ? account.name : null}
+      stripePublishableKey={stripePublishableKey(business.id)}
     />
   );
 }

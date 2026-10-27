@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getBusinessBySlug, getHomepageBusiness } from "@/lib/businesses";
 import { OrderError } from "@/lib/db";
 import { readDeliveryAddress, validateDeliveryAddress } from "@/lib/delivery";
-import { placeOrder } from "@/lib/orders";
-import { validateMockCard } from "@/lib/payment";
+import { placeOrder, priceOrderLines } from "@/lib/orders";
+import { chargeCard, paidIntent, stripeSettings } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,8 +23,9 @@ type Body = {
     state?: string;
     postalCode?: string;
   };
-  card?: { number?: string; expiry?: string; cvc?: string; name?: string };
-  /** Testing only: record a paid order with no card check. */
+  paymentMethodId?: string;
+  paymentIntentId?: string;
+  /** Records an order without charging a card. */
   skipPayment?: boolean;
   lines?: { menuItemId?: number; quantity?: number }[];
 };
@@ -71,29 +72,81 @@ export async function POST(request: Request) {
     if (!Number.isInteger(menuItemId) || !Number.isInteger(quantity)) continue;
     merged.set(menuItemId, (merged.get(menuItemId) ?? 0) + quantity);
   }
-  if (merged.size === 0) {
+  const orderLines = [...merged.entries()].map(([menuItemId, quantity]) => ({ menuItemId, quantity }));
+  if (orderLines.length === 0) {
     return NextResponse.json({ error: "Add at least one meal." }, { status: 400 });
-  }
-
-  const skipPayment = body.skipPayment === true;
-  let cardLast4 = "TEST";
-  if (!skipPayment) {
-    const card = validateMockCard({
-      number: clean(body.card?.number, 24),
-      expiry: clean(body.card?.expiry, 7),
-      cvc: clean(body.card?.cvc, 4),
-      name: clean(body.card?.name, 80),
-    });
-    if (!card.ok) {
-      return NextResponse.json({ error: card.error }, { status: 400 });
-    }
-    cardLast4 = card.last4;
   }
 
   const slug = clean(body.businessSlug, 80);
   const business = slug ? getBusinessBySlug(slug) : getHomepageBusiness();
   if (!business) {
     return NextResponse.json({ error: "That menu is not available." }, { status: 400 });
+  }
+
+  const skipPayment = body.skipPayment === true;
+  let cardLast4 = "TEST";
+  let stripePaymentIntentId = "";
+  if (!skipPayment) {
+    const stripe = stripeSettings(business.id);
+    if (!stripe.connected) {
+      return NextResponse.json(
+        { error: "Stripe is not connected, so the card was not charged." },
+        { status: 400 },
+      );
+    }
+    let quote;
+    try {
+      quote = priceOrderLines(business.id, orderLines);
+    } catch (error) {
+      if (error instanceof OrderError) return NextResponse.json({ error: error.message }, { status: 400 });
+      throw error;
+    }
+    const metadata = {
+      businessId: String(business.id),
+      customerName,
+      phone,
+      email,
+      companyName,
+      notes: notes.replace(/\s+/g, " "),
+      smsOptIn: body.smsOptIn === true ? "1" : "0",
+      line1: delivery.line1,
+      line2: delivery.line2,
+      city: delivery.city,
+      state: delivery.state,
+      postalCode: delivery.postalCode,
+      lines: orderLines.map((line) => `${line.menuItemId}:${line.quantity}`).join(","),
+    };
+    if (body.paymentIntentId) {
+      const paid = await paidIntent(business.id, clean(body.paymentIntentId, 80));
+      if (!paid.ok) return NextResponse.json({ error: paid.error }, { status: 400 });
+      if (paid.metadata.businessId !== String(business.id) || paid.amountCents !== quote.totalCents) {
+        return NextResponse.json(
+          { error: "That payment does not match this order, so it was not recorded as paid." },
+          { status: 400 },
+        );
+      }
+      cardLast4 = paid.last4 || "CARD";
+      stripePaymentIntentId = paid.paymentIntentId;
+    } else if (body.paymentMethodId) {
+      const charged = await chargeCard({
+        businessId: business.id,
+        amountCents: quote.totalCents,
+        paymentMethodId: clean(body.paymentMethodId, 80),
+        metadata,
+      });
+      if (!charged.ok) return NextResponse.json({ error: charged.error }, { status: 400 });
+      if (charged.status === "requires_action") {
+        return NextResponse.json({
+          requiresAction: true,
+          clientSecret: charged.clientSecret,
+          paymentIntentId: charged.paymentIntentId,
+        });
+      }
+      cardLast4 = charged.last4 || "CARD";
+      stripePaymentIntentId = charged.paymentIntentId;
+    } else {
+      return NextResponse.json({ error: "The card was not charged." }, { status: 400 });
+    }
   }
 
   try {
@@ -105,10 +158,11 @@ export async function POST(request: Request) {
       notes,
       smsOptIn: body.smsOptIn === true,
       cardLast4,
+      stripePaymentIntentId,
       delivery,
-      lines: [...merged.entries()].map(([menuItemId, quantity]) => ({ menuItemId, quantity })),
+      lines: orderLines,
     });
-    return NextResponse.json({ ...order, skipPayment });
+    return NextResponse.json({ ...order, skipPayment, last4: cardLast4 });
   } catch (error) {
     if (error instanceof OrderError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

@@ -2,6 +2,7 @@ import { PublicSite } from "@/components/public-site";
 import { currentCustomer } from "@/lib/customer-auth";
 import { getHomepageBusiness } from "@/lib/businesses";
 import { getPublicMenu } from "@/lib/menu";
+import { stripePublishableKey } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,6 +25,7 @@ export default async function HomePage() {
       menu={menu}
       businessSlug={business.slug}
       accountName={account?.name ?? null}
+      stripePublishableKey={stripePublishableKey(business.id)}
     />
   );
 }

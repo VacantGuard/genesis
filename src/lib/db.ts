@@ -20,7 +20,7 @@ export type NewOrderInput = {
   cardLast4: string;
   lines: OrderLineInput[];
   smsOptIn?: boolean;
-  stripeSessionId?: string;
+  stripePaymentIntentId?: string;
   delivery?: {
     line1: string;
     line2: string;

@@ -50,6 +50,81 @@ function withDelivery(row: {
   };
 }
 
+function ensureStripeColumn(db: ReturnType<typeof getDb>) {
+  const columns = db.prepare("PRAGMA table_info(orders)").all() as { name: string }[];
+  if (!columns.some((column) => column.name === "stripe_payment_intent_id")) {
+    db.exec("ALTER TABLE orders ADD COLUMN stripe_payment_intent_id TEXT NOT NULL DEFAULT ''");
+  }
+}
+
+export function priceOrderLines(businessId: number, lines: NewOrderInput["lines"]) {
+  const db = getDb();
+  if (lines.length === 0) throw new OrderError("Add at least one meal.");
+  const priced: { name: string; quantity: number; unitPriceCents: number }[] = [];
+  for (const line of lines) {
+    if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 25) {
+      throw new OrderError("Quantity must be between 1 and 25.");
+    }
+    const item = db
+      .prepare(
+        `SELECT i.name, i.price_cents AS priceCents, i.available
+         FROM menu_items i
+         JOIN menu_categories c ON c.id = i.category_id
+         WHERE i.id = ? AND c.business_id = ?`,
+      )
+      .get(line.menuItemId, businessId) as
+      | { name: string; priceCents: number; available: number }
+      | undefined;
+    if (!item || item.available !== 1) {
+      throw new OrderError("Something in the cart is no longer available. Refresh the menu.");
+    }
+    priced.push({ name: item.name, quantity: line.quantity, unitPriceCents: item.priceCents });
+  }
+  return {
+    priced,
+    totalCents: priced.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0),
+  };
+}
+
+function savedOrder(db: ReturnType<typeof getDb>, orderId: number) {
+  ensureOrderDeliveryColumns(db);
+  const row = db
+    .prepare(
+      `SELECT order_number AS orderNumber, customer_name AS customerName, total_cents AS totalCents,
+              delivery_line1 AS deliveryLine1, delivery_line2 AS deliveryLine2, delivery_city AS deliveryCity,
+              delivery_state AS deliveryState, delivery_postal_code AS deliveryPostalCode
+       FROM orders WHERE id = ?`,
+    )
+    .get(orderId) as
+    | {
+        orderNumber: string;
+        customerName: string;
+        totalCents: number;
+        deliveryLine1: string;
+        deliveryLine2: string;
+        deliveryCity: string;
+        deliveryState: string;
+        deliveryPostalCode: string;
+      }
+    | undefined;
+  if (!row) throw new OrderError("That paid order could not be read back.");
+  const items = db
+    .prepare(
+      `SELECT item_name AS name, quantity, unit_price_cents AS unitPriceCents
+       FROM order_items WHERE order_id = ? ORDER BY id`,
+    )
+    .all(orderId) as { name: string; quantity: number; unitPriceCents: number }[];
+  const delivery = withDelivery(row);
+  return {
+    orderNumber: row.orderNumber,
+    totalCents: row.totalCents,
+    customerName: row.customerName,
+    deliveryAddress: delivery.deliveryAddress,
+    deliveryLocateUrl: delivery.deliveryLocateUrl,
+    items,
+  };
+}
+
 function nextOrderNumber(db: ReturnType<typeof getDb>) {
   const row = db
     .prepare("SELECT order_number AS orderNumber FROM orders ORDER BY id DESC LIMIT 1")
@@ -62,33 +137,21 @@ function nextOrderNumber(db: ReturnType<typeof getDb>) {
 export function placeOrder(businessId: number, input: NewOrderInput) {
   const db = getDb();
   const run = db.transaction(() => {
-    if (input.lines.length === 0) throw new OrderError("Add at least one meal.");
-
-    const priced: { name: string; quantity: number; unitPriceCents: number }[] = [];
-    for (const line of input.lines) {
-      if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 25) {
-        throw new OrderError("Quantity must be between 1 and 25.");
-      }
-      const item = db
-        .prepare(
-          `SELECT i.name, i.price_cents AS priceCents, i.available
-           FROM menu_items i
-           JOIN menu_categories c ON c.id = i.category_id
-           WHERE i.id = ? AND c.business_id = ?`,
-        )
-        .get(line.menuItemId, businessId) as
-        | { name: string; priceCents: number; available: number }
-        | undefined;
-      if (!item || item.available !== 1) {
-        throw new OrderError("Something in the cart is no longer available. Refresh the menu.");
-      }
-      priced.push({ name: item.name, quantity: line.quantity, unitPriceCents: item.priceCents });
-    }
-
     const orderColumns = db.prepare("PRAGMA table_info(orders)").all() as { name: string }[];
     if (!orderColumns.some((column) => column.name === "sms_opt_in")) {
       db.exec("ALTER TABLE orders ADD COLUMN sms_opt_in INTEGER NOT NULL DEFAULT 0");
     }
+    ensureStripeColumn(db);
+    const paymentIntentId = input.stripePaymentIntentId?.trim() ?? "";
+    if (paymentIntentId) {
+      const existing = db
+        .prepare(
+          "SELECT id FROM orders WHERE business_id = ? AND stripe_payment_intent_id = ? AND stripe_payment_intent_id != ''",
+        )
+        .get(businessId, paymentIntentId) as { id: number } | undefined;
+      if (existing) return savedOrder(db, existing.id);
+    }
+    const { priced, totalCents } = priceOrderLines(businessId, input.lines);
     ensureOrderDeliveryColumns(db);
     const delivery = input.delivery ?? {
       line1: "",
@@ -97,15 +160,14 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
       state: "",
       postalCode: "",
     };
-    const totalCents = priced.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0);
     const orderNumber = nextOrderNumber(db);
     const createdAt = new Date().toISOString();
     const inserted = db
       .prepare(
         `INSERT INTO orders
           (order_number, customer_name, phone, email, company_name, notes, card_last4, total_cents, status, created_at, business_id, sms_opt_in,
-           delivery_line1, delivery_line2, delivery_city, delivery_state, delivery_postal_code)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, ?, ?, ?, ?, ?)`,
+           delivery_line1, delivery_line2, delivery_city, delivery_state, delivery_postal_code, stripe_payment_intent_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         orderNumber,
@@ -124,6 +186,7 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
         delivery.city,
         delivery.state,
         delivery.postalCode,
+        paymentIntentId,
       );
     const orderId = Number(inserted.lastInsertRowid);
     const insertItem = db.prepare(

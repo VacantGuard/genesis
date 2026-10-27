@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatMoney } from "@/lib/format";
 import type { BusinessProfile, PublicCategory } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,27 @@ type Confirmation = {
   items: { name: string; quantity: number; unitPriceCents: number }[];
   last4: string;
   skipPayment?: boolean;
+  requiresAction?: boolean;
+  clientSecret?: string;
+  paymentIntentId?: string;
+};
+
+type StripeCard = {
+  mount: (el: HTMLElement) => void;
+  destroy: () => void;
+};
+
+type StripeInstance = {
+  elements: () => { create: (type: "card") => StripeCard };
+  createPaymentMethod: (args: {
+    type: "card";
+    card: StripeCard;
+    billing_details?: { name?: string; email?: string; phone?: string };
+  }) => Promise<{ error?: { message?: string }; paymentMethod?: { id: string } }>;
+  confirmCardPayment: (clientSecret: string) => Promise<{
+    error?: { message?: string };
+    paymentIntent?: { id: string; status: string };
+  }>;
 };
 
 export function PublicSite({
@@ -25,11 +46,13 @@ export function PublicSite({
   menu,
   businessSlug,
   accountName,
+  stripePublishableKey,
 }: {
   profile: BusinessProfile;
   menu: PublicCategory[];
   businessSlug: string;
   accountName?: string | null;
+  stripePublishableKey?: string | null;
 }) {
   const [cart, setCart] = useState<Record<number, number>>({});
   const [customerName, setCustomerName] = useState("");
@@ -42,11 +65,10 @@ export function PublicSite({
   const [deliveryState, setDeliveryState] = useState("");
   const [deliveryPostalCode, setDeliveryPostalCode] = useState("");
   const [notes, setNotes] = useState("");
-  const [cardName, setCardName] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvc, setCvc] = useState("");
   const [smsOptIn, setSmsOptIn] = useState(false);
+  const [stripeReady, setStripeReady] = useState(false);
+  const stripeRef = useRef<StripeInstance | null>(null);
+  const cardRef = useRef<StripeCard | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -72,6 +94,43 @@ export function PublicSite({
   const count = lines.reduce((sum, line) => sum + line.quantity, 0);
   const total = lines.reduce((sum, line) => sum + line.item.priceCents * line.quantity, 0);
 
+  useEffect(() => {
+    if (!stripePublishableKey) return;
+    let cancelled = false;
+    const mountCard = () => {
+      if (cancelled) return;
+      const factory = (window as Window & { Stripe?: (key: string) => StripeInstance }).Stripe;
+      const mount = document.getElementById("stripe-card");
+      if (!factory || !mount) {
+        setError("Card checkout could not load.");
+        return;
+      }
+      const stripe = factory(stripePublishableKey);
+      const card = stripe.elements().create("card");
+      card.mount(mount);
+      stripeRef.current = stripe;
+      cardRef.current = card;
+      setStripeReady(true);
+    };
+    if ((window as Window & { Stripe?: unknown }).Stripe) {
+      mountCard();
+    } else {
+      const existing = document.querySelector<HTMLScriptElement>('script[src="https://js.stripe.com/v3/"]');
+      const script = existing ?? document.createElement("script");
+      script.src = "https://js.stripe.com/v3/";
+      script.async = true;
+      script.addEventListener("load", mountCard, { once: true });
+      if (!existing) document.head.appendChild(script);
+    }
+    return () => {
+      cancelled = true;
+      cardRef.current?.destroy();
+      cardRef.current = null;
+      stripeRef.current = null;
+      setStripeReady(false);
+    };
+  }, [stripePublishableKey]);
+
   function add(id: number) {
     setConfirmation(null);
     setCart((current) => ({ ...current, [id]: Math.min(25, (current[id] ?? 0) + 1) }));
@@ -86,49 +145,57 @@ export function PublicSite({
     });
   }
 
+  function orderPayload(extra: Record<string, unknown>) {
+    return {
+      customerName,
+      phone,
+      email,
+      companyName,
+      notes,
+      smsOptIn,
+      delivery: {
+        line1: deliveryLine1,
+        line2: deliveryLine2,
+        city: deliveryCity,
+        state: deliveryState,
+        postalCode: deliveryPostalCode,
+      },
+      businessSlug,
+      lines: lines.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity })),
+      ...extra,
+    };
+  }
+
+  async function postOrder(extra: Record<string, unknown>) {
+    const response = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(orderPayload(extra)),
+    });
+    const data = (await response.json()) as Confirmation & { error?: string };
+    return { response, data };
+  }
+
+  function showConfirmation(data: Confirmation, skipPayment: boolean) {
+    setConfirmation({
+      ...data,
+      last4: data.last4 || (skipPayment ? "TEST" : ""),
+      skipPayment,
+    });
+    setCart({});
+    document.getElementById("pos")?.scrollIntoView({ behavior: "smooth" });
+  }
+
   async function submitOrder(skipPayment: boolean) {
     setError("");
     setPending(true);
     try {
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          customerName,
-          phone,
-          email,
-          companyName,
-          notes,
-          smsOptIn,
-          skipPayment,
-          delivery: {
-            line1: deliveryLine1,
-            line2: deliveryLine2,
-            city: deliveryCity,
-            state: deliveryState,
-            postalCode: deliveryPostalCode,
-          },
-          businessSlug,
-          card: skipPayment
-            ? undefined
-            : { name: cardName, number: cardNumber, expiry, cvc },
-          lines: lines.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity })),
-        }),
-      });
-      const data = (await response.json()) as Confirmation & { error?: string; skipPayment?: boolean };
+      const { response, data } = await postOrder({ skipPayment });
       if (!response.ok) {
         setError(data.error || "The order was not recorded.");
         return;
       }
-      setConfirmation({
-        ...data,
-        last4: skipPayment ? "TEST" : cardNumber.replace(/\D/g, "").slice(-4),
-        skipPayment,
-      });
-      setCart({});
-      setCardNumber("");
-      setCvc("");
-      document.getElementById("pos")?.scrollIntoView({ behavior: "smooth" });
+      showConfirmation(data, skipPayment);
     } catch {
       setError("The kitchen could not be reached. Try again.");
     } finally {
@@ -138,7 +205,49 @@ export function PublicSite({
 
   async function pay(event: React.FormEvent) {
     event.preventDefault();
-    await submitOrder(false);
+    setError("");
+    if (!stripePublishableKey) {
+      setError("Stripe is not connected, so the card was not charged.");
+      return;
+    }
+    const stripe = stripeRef.current;
+    const card = cardRef.current;
+    if (!stripe || !card) {
+      setError("Card checkout is still loading.");
+      return;
+    }
+    setPending(true);
+    try {
+      const created = await stripe.createPaymentMethod({
+        type: "card",
+        card,
+        billing_details: { name: customerName, email, phone },
+      });
+      if (created.error || !created.paymentMethod) {
+        setError(created.error?.message || "The card was not charged.");
+        return;
+      }
+      let { response, data } = await postOrder({ paymentMethodId: created.paymentMethod.id });
+      if (data.requiresAction && data.clientSecret) {
+        const confirmed = await stripe.confirmCardPayment(data.clientSecret);
+        if (confirmed.error || confirmed.paymentIntent?.status !== "succeeded") {
+          setError(confirmed.error?.message || "The card was not charged.");
+          return;
+        }
+        const done = await postOrder({ paymentIntentId: confirmed.paymentIntent.id });
+        response = done.response;
+        data = done.data;
+      }
+      if (!response.ok) {
+        setError(data.error || "The card was not charged.");
+        return;
+      }
+      showConfirmation(data, false);
+    } catch {
+      setError("The card was not charged. Try again.");
+    } finally {
+      setPending(false);
+    }
   }
 
   const field = "h-10 rounded bg-[#f4f4f4] border-0 shadow-none focus-visible:ring-[#171a20]";
@@ -251,8 +360,9 @@ export function PublicSite({
             <div>
               <h2 className="text-4xl font-medium tracking-tight">Order</h2>
               <p className="mt-3 max-w-md text-sm text-[#5c5e62]">
-                Practice checkout. The card is checked here and the order is marked paid. No charge
-                is sent to a bank.
+                {stripePublishableKey
+                  ? "Pay with a card. Stripe charges it, then the order is marked paid."
+                  : "Card checkout is waiting on Stripe. Add the publishable key, secret key, and webhook secret under Business in the staff terminal. A card is not charged until then."}
               </p>
               <div className="mt-6 grid gap-3">
                 {lines.length === 0 ? (
@@ -309,7 +419,7 @@ export function PublicSite({
                   .
                   {confirmation.skipPayment
                     ? " No card was used."
-                    : ` Card ending ${confirmation.last4}. This was a practice payment.`}
+                    : ` Card ending ${confirmation.last4} was charged through Stripe.`}
                   {smsOptIn
                     ? ` You are enrolled in ${profile.name} menu texts. A confirmation text welcomes you to the program. Reply STOP to opt out or HELP for help.`
                     : ""}
@@ -448,52 +558,16 @@ export function PublicSite({
                     />
                   </label>
                 </div>
-                <div className="mt-2 grid gap-3 border-t pt-4 sm:grid-cols-2">
-                  <label className="grid gap-1.5 text-sm sm:col-span-2">
-                    <span className="font-medium">Name on card</span>
-                    <Input
-                      value={cardName}
-                      onChange={(event) => setCardName(event.target.value)}
-                      required
-                      autoComplete="cc-name"
-                      className={field}
-                    />
-                  </label>
-                  <label className="grid gap-1.5 text-sm sm:col-span-2">
-                    <span className="font-medium">Card number</span>
-                    <Input
-                      inputMode="numeric"
-                      autoComplete="cc-number"
-                      value={cardNumber}
-                      onChange={(event) => setCardNumber(event.target.value)}
-                      placeholder="4242 4242 4242 4242"
-                      required
-                      className={field}
-                    />
-                  </label>
-                  <label className="grid gap-1.5 text-sm">
-                    <span className="font-medium">Expiry</span>
-                    <Input
-                      value={expiry}
-                      onChange={(event) => setExpiry(event.target.value)}
-                      placeholder="12/28"
-                      autoComplete="cc-exp"
-                      required
-                      className={field}
-                    />
-                  </label>
-                  <label className="grid gap-1.5 text-sm">
-                    <span className="font-medium">CVC</span>
-                    <Input
-                      value={cvc}
-                      onChange={(event) => setCvc(event.target.value)}
-                      placeholder="123"
-                      autoComplete="cc-csc"
-                      required
-                      className={field}
-                    />
-                  </label>
-                </div>
+                {stripePublishableKey ? (
+                  <div className="mt-2 grid gap-1.5 border-t pt-4 text-sm">
+                    <span className="font-medium">Card</span>
+                    <div id="stripe-card" className="rounded bg-[#f4f4f4] px-3 py-3" />
+                  </div>
+                ) : (
+                  <p className="mt-2 border-t pt-4 text-sm text-[#5c5e62]">
+                    Stripe is not connected, so this checkout will not charge a card.
+                  </p>
+                )}
                 {error ? (
                   <p role="alert" className="text-sm text-destructive">
                     {error}
@@ -521,13 +595,15 @@ export function PublicSite({
                     .
                   </span>
                 </label>
-                <Button
-                  type="submit"
-                  disabled={pending || lines.length === 0}
-                  className="mt-2 h-10 rounded bg-[#3e6ae1] text-white hover:bg-[#3457b1]"
-                >
-                  {pending ? "Recording payment…" : `Pay ${formatMoney(total)}`}
-                </Button>
+                {stripePublishableKey ? (
+                  <Button
+                    type="submit"
+                    disabled={pending || lines.length === 0 || !stripeReady}
+                    className="mt-2 h-10 rounded bg-[#3e6ae1] text-white hover:bg-[#3457b1]"
+                  >
+                    {pending ? "Charging card…" : `Pay ${formatMoney(total)}`}
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="outline"
@@ -538,9 +614,9 @@ export function PublicSite({
                   {pending ? "Recording order…" : "Place test order (no card)"}
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  Practice card: 4242 4242 4242 4242, any future expiry, any 3-digit code. Or use
-                  “Place test order (no card)” to checkout without payment for testing. Only the last
-                  four digits are stored when a card is used.
+                  {stripePublishableKey
+                    ? "Pay charges the card through Stripe. Place test order records a ticket without charging a card."
+                    : "Place test order records a ticket without charging a card. Pay stays off until Stripe is connected under Business."}
                 </p>
               </form>
             )}
