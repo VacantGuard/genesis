@@ -9,6 +9,7 @@ export type CustomerOrderLine = {
 export type CustomerOrderHistory = {
   id: number;
   orderNumber: string;
+  phone: string;
   totalCents: number;
   createdAt: string;
   status: string;
@@ -99,6 +100,7 @@ function withItems(db: ReturnType<typeof getDb>, orders: OrderRow[]): CustomerOr
   return orders.map((order) => ({
     id: order.id,
     orderNumber: order.orderNumber,
+    phone: order.phone,
     totalCents: order.totalCents,
     createdAt: order.createdAt,
     status: order.status,

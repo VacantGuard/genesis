@@ -254,13 +254,19 @@ export async function signInCustomer(input: { email: string; password: string })
   return { ok: true as const };
 }
 
+function phoneKey(phone: string) {
+  return phone.replace(/\D/g, "");
+}
+
 export function ordersForCustomer(account: CustomerAccount): CustomerOrder[] {
-  if (!account.customerId) return [];
+  const key = phoneKey(account.phone);
+  if (!account.customerId || key.length < 7) return [];
   return ordersForCustomerRecord(account.businessId, {
     id: account.customerId,
     phone: account.phone,
     email: account.email,
   })
+    .filter((order) => order.status === "paid" && phoneKey(order.phone) === key)
     .slice(0, 20)
     .map((order) => ({
       orderNumber: order.orderNumber,
