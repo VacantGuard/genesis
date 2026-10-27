@@ -57,11 +57,12 @@ export default async function OrdersPage() {
               ) : null}
               <p className="text-sm text-muted-foreground">Card ending {order.cardLast4}</p>
               {order.notes ? <p className="text-sm">Notes: {order.notes}</p> : null}
-              <ul className="grid gap-1 text-sm">
-                {order.items.map((item) => (
-                  <li key={`${order.id}-${item.name}`} className="flex justify-between gap-3">
+              <ul className="grid gap-2 text-sm">
+                {order.items.map((item, index) => (
+                  <li key={`${order.id}-${index}`} className="flex justify-between gap-3">
                     <span>
                       {item.quantity} × {item.name}
+                      {item.note ? <span className="block text-muted-foreground">{item.note}</span> : null}
                     </span>
                     <span>{formatMoney(item.unitPriceCents * item.quantity)}</span>
                   </li>

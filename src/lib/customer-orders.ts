@@ -1,9 +1,11 @@
 import { getDb } from "./db";
+import { ensureOrderItemNoteColumn } from "./orders";
 
 export type CustomerOrderLine = {
   name: string;
   quantity: number;
   unitPriceCents: number;
+  note: string;
 };
 
 export type CustomerOrderHistory = {
@@ -93,8 +95,9 @@ export function syncOrdersToCustomer(businessId: number, customerId: number, pho
 }
 
 function withItems(db: ReturnType<typeof getDb>, orders: OrderRow[]): CustomerOrderHistory[] {
+  ensureOrderItemNoteColumn(db);
   const items = db.prepare(
-    `SELECT item_name AS name, quantity, unit_price_cents AS unitPriceCents
+    `SELECT item_name AS name, quantity, unit_price_cents AS unitPriceCents, notes AS note
      FROM order_items WHERE order_id = ? ORDER BY id`,
   );
   return orders.map((order) => ({

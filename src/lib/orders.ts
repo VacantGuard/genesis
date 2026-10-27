@@ -50,6 +50,17 @@ function withDelivery(row: {
   };
 }
 
+export function cleanLineNote(value: string | undefined) {
+  return (value ?? "").trim().replace(/\s+/g, " ").slice(0, 200);
+}
+
+export function ensureOrderItemNoteColumn(db: ReturnType<typeof getDb>) {
+  const columns = db.prepare("PRAGMA table_info(order_items)").all() as { name: string }[];
+  if (!columns.some((column) => column.name === "notes")) {
+    db.exec("ALTER TABLE order_items ADD COLUMN notes TEXT NOT NULL DEFAULT ''");
+  }
+}
+
 function ensureStripeColumn(db: ReturnType<typeof getDb>) {
   const columns = db.prepare("PRAGMA table_info(orders)").all() as { name: string }[];
   if (!columns.some((column) => column.name === "stripe_payment_intent_id")) {
@@ -60,7 +71,7 @@ function ensureStripeColumn(db: ReturnType<typeof getDb>) {
 export function priceOrderLines(businessId: number, lines: NewOrderInput["lines"]) {
   const db = getDb();
   if (lines.length === 0) throw new OrderError("Add at least one meal.");
-  const priced: { name: string; quantity: number; unitPriceCents: number }[] = [];
+  const priced: { name: string; quantity: number; unitPriceCents: number; note: string }[] = [];
   for (const line of lines) {
     if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 25) {
       throw new OrderError("Quantity must be between 1 and 25.");
@@ -78,7 +89,12 @@ export function priceOrderLines(businessId: number, lines: NewOrderInput["lines"
     if (!item || item.available !== 1) {
       throw new OrderError("Something in the cart is no longer available. Refresh the menu.");
     }
-    priced.push({ name: item.name, quantity: line.quantity, unitPriceCents: item.priceCents });
+    priced.push({
+      name: item.name,
+      quantity: line.quantity,
+      unitPriceCents: item.priceCents,
+      note: cleanLineNote(line.note),
+    });
   }
   return {
     priced,
@@ -108,12 +124,13 @@ function savedOrder(db: ReturnType<typeof getDb>, orderId: number) {
       }
     | undefined;
   if (!row) throw new OrderError("That paid order could not be read back.");
+  ensureOrderItemNoteColumn(db);
   const items = db
     .prepare(
-      `SELECT item_name AS name, quantity, unit_price_cents AS unitPriceCents
+      `SELECT item_name AS name, quantity, unit_price_cents AS unitPriceCents, notes AS note
        FROM order_items WHERE order_id = ? ORDER BY id`,
     )
-    .all(orderId) as { name: string; quantity: number; unitPriceCents: number }[];
+    .all(orderId) as { name: string; quantity: number; unitPriceCents: number; note: string }[];
   const delivery = withDelivery(row);
   return {
     orderNumber: row.orderNumber,
@@ -142,6 +159,7 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
       db.exec("ALTER TABLE orders ADD COLUMN sms_opt_in INTEGER NOT NULL DEFAULT 0");
     }
     ensureStripeColumn(db);
+    ensureOrderItemNoteColumn(db);
     const paymentIntentId = input.stripePaymentIntentId?.trim() ?? "";
     if (paymentIntentId) {
       const existing = db
@@ -190,9 +208,9 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
       );
     const orderId = Number(inserted.lastInsertRowid);
     const insertItem = db.prepare(
-      `INSERT INTO order_items (order_id, item_name, quantity, unit_price_cents) VALUES (?, ?, ?, ?)`,
+      `INSERT INTO order_items (order_id, item_name, quantity, unit_price_cents, notes) VALUES (?, ?, ?, ?, ?)`,
     );
-    for (const line of priced) insertItem.run(orderId, line.name, line.quantity, line.unitPriceCents);
+    for (const line of priced) insertItem.run(orderId, line.name, line.quantity, line.unitPriceCents, line.note);
     if (delivery.line1) {
       upsertCustomerDeliveryFromOrder(businessId, {
         customerName: input.customerName,
@@ -217,6 +235,7 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
 export function listOrders(businessId: number): KitchenOrder[] {
   const db = getDb();
   ensureOrderDeliveryColumns(db);
+  ensureOrderItemNoteColumn(db);
   const orders = db
     .prepare(
       `SELECT id, order_number AS orderNumber, customer_name AS customerName, phone, email,
@@ -235,7 +254,7 @@ export function listOrders(businessId: number): KitchenOrder[] {
       deliveryPostalCode: string;
     })[];
   const itemStmt = db.prepare(
-    `SELECT item_name AS name, quantity, unit_price_cents AS unitPriceCents
+    `SELECT item_name AS name, quantity, unit_price_cents AS unitPriceCents, notes AS note
      FROM order_items WHERE order_id = ? ORDER BY id`,
   );
   return orders.map((order) => ({
@@ -248,6 +267,7 @@ export function listOrders(businessId: number): KitchenOrder[] {
 export function orderExportRows(businessId: number) {
   const db = getDb();
   ensureOrderDeliveryColumns(db);
+  ensureOrderItemNoteColumn(db);
   return db
     .prepare(
       `SELECT o.order_number AS orderNumber, o.customer_name AS customerName,
@@ -256,7 +276,7 @@ export function orderExportRows(businessId: number) {
               o.delivery_city AS deliveryCity, o.delivery_state AS deliveryState,
               o.delivery_postal_code AS deliveryPostalCode,
               oi.item_name AS item, oi.quantity, oi.unit_price_cents AS unitPriceCents,
-              o.notes, o.created_at AS placedAt
+              oi.notes AS itemNote, o.notes, o.created_at AS placedAt
        FROM orders o
        JOIN order_items oi ON oi.order_id = o.id
        WHERE o.business_id = ?
@@ -278,6 +298,7 @@ export function orderExportRows(businessId: number) {
         item: string;
         quantity: number;
         unitPriceCents: number;
+        itemNote: string;
         notes: string;
         placedAt: string;
       };
@@ -293,6 +314,7 @@ export function orderExportRows(businessId: number) {
         item: order.item,
         quantity: order.quantity,
         unitPriceCents: order.unitPriceCents,
+        itemNote: order.itemNote,
         notes: order.notes,
         placedAt: order.placedAt,
       };

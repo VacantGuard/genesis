@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getBusinessBySlug, getHomepageBusiness } from "@/lib/businesses";
 import { OrderError } from "@/lib/db";
 import { readDeliveryAddress, validateDeliveryAddress } from "@/lib/delivery";
-import { placeOrder, priceOrderLines } from "@/lib/orders";
+import { cleanLineNote, placeOrder, priceOrderLines } from "@/lib/orders";
 import { chargeCard, paidIntent, stripeSettings } from "@/lib/stripe";
 
 export const runtime = "nodejs";
@@ -27,7 +27,7 @@ type Body = {
   paymentIntentId?: string;
   /** Records an order without charging a card. */
   skipPayment?: boolean;
-  lines?: { menuItemId?: number; quantity?: number }[];
+  lines?: { menuItemId?: number; quantity?: number; note?: string }[];
 };
 
 function clean(value: unknown, max: number) {
@@ -66,13 +66,20 @@ export async function POST(request: Request) {
 
   const lines = Array.isArray(body.lines) ? body.lines : [];
   const merged = new Map<number, number>();
+  const lineNotes = new Map<number, string>();
   for (const line of lines) {
     const menuItemId = Number(line.menuItemId);
     const quantity = Number(line.quantity);
     if (!Number.isInteger(menuItemId) || !Number.isInteger(quantity)) continue;
     merged.set(menuItemId, (merged.get(menuItemId) ?? 0) + quantity);
+    const note = cleanLineNote(line.note);
+    if (note && !lineNotes.has(menuItemId)) lineNotes.set(menuItemId, note);
   }
-  const orderLines = [...merged.entries()].map(([menuItemId, quantity]) => ({ menuItemId, quantity }));
+  const orderLines = [...merged.entries()].map(([menuItemId, quantity]) => ({
+    menuItemId,
+    quantity,
+    note: lineNotes.get(menuItemId) ?? "",
+  }));
   if (orderLines.length === 0) {
     return NextResponse.json({ error: "Add at least one meal." }, { status: 400 });
   }
@@ -101,7 +108,7 @@ export async function POST(request: Request) {
       if (error instanceof OrderError) return NextResponse.json({ error: error.message }, { status: 400 });
       throw error;
     }
-    const metadata = {
+    const metadata: Record<string, string> = {
       businessId: String(business.id),
       customerName,
       phone,
@@ -116,6 +123,9 @@ export async function POST(request: Request) {
       postalCode: delivery.postalCode,
       lines: orderLines.map((line) => `${line.menuItemId}:${line.quantity}`).join(","),
     };
+    for (const line of orderLines) {
+      if (line.note) metadata[`n${line.menuItemId}`] = line.note;
+    }
     if (body.paymentIntentId) {
       const paid = await paidIntent(business.id, clean(body.paymentIntentId, 80));
       if (!paid.ok) return NextResponse.json({ error: paid.error }, { status: 400 });

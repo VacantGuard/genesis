@@ -9,6 +9,7 @@ export class OrderError extends Error {}
 export type OrderLineInput = {
   menuItemId: number;
   quantity: number;
+  note?: string;
 };
 
 export type NewOrderInput = {
@@ -246,7 +247,8 @@ function migrate(db: Database.Database) {
       order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
       item_name TEXT NOT NULL,
       quantity INTEGER NOT NULL,
-      unit_price_cents INTEGER NOT NULL
+      unit_price_cents INTEGER NOT NULL,
+      notes TEXT NOT NULL DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS campaigns (

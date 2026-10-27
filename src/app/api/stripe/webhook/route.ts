@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { OrderError } from "@/lib/db";
 import { readDeliveryAddress } from "@/lib/delivery";
-import { placeOrder, priceOrderLines } from "@/lib/orders";
+import { cleanLineNote, placeOrder, priceOrderLines } from "@/lib/orders";
 import { businessIdForWebhook, paidIntent } from "@/lib/stripe";
 
 export const runtime = "nodejs";
@@ -39,7 +39,10 @@ export async function POST(request: Request) {
   const paid = await paidIntent(businessId, paymentIntentId);
   if (!paid.ok || paid.metadata.businessId !== String(businessId)) return NextResponse.json({ received: true });
 
-  const lines = linesFrom(paid.metadata.lines || "");
+  const lines = linesFrom(paid.metadata.lines || "").map((line) => ({
+    ...line,
+    note: cleanLineNote(paid.metadata[`n${line.menuItemId}`]),
+  }));
   if (lines.length === 0) return NextResponse.json({ received: true });
   try {
     const quote = priceOrderLines(businessId, lines);

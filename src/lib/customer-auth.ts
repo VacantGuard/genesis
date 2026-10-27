@@ -282,6 +282,8 @@ export function ordersForCustomer(account: CustomerAccount): CustomerOrder[] {
       totalCents: order.totalCents,
       createdAt: order.createdAt,
       status: order.status,
-      items: order.items.map((line) => `${line.quantity} × ${line.name}`).join(", "),
+      items: order.items
+        .map((line) => `${line.quantity} × ${line.name}${line.note ? ` — ${line.note}` : ""}`)
+        .join(", "),
     }));
 }

@@ -40,11 +40,12 @@ export default async function CustomerOrdersPage({ params }: { params: Promise<{
                 <h3 className="font-heading text-xl tracking-tight">{order.orderNumber}</h3>
                 <p className="text-muted-foreground">{formatWhen(order.createdAt)}</p>
               </div>
-              <ul className="grid gap-1">
-                {order.items.map((item) => (
-                  <li key={`${order.id}-${item.name}`} className="flex justify-between gap-3">
+              <ul className="grid gap-2">
+                {order.items.map((item, index) => (
+                  <li key={`${order.id}-${index}`} className="flex justify-between gap-3">
                     <span>
                       {item.quantity} × {item.name}
+                      {item.note ? <span className="block text-muted-foreground">{item.note}</span> : null}
                     </span>
                     <span>{formatMoney(item.unitPriceCents * item.quantity)}</span>
                   </li>

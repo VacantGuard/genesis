@@ -15,7 +15,7 @@ type Confirmation = {
   customerName: string;
   deliveryAddress?: string;
   deliveryLocateUrl?: string;
-  items: { name: string; quantity: number; unitPriceCents: number }[];
+  items: { name: string; quantity: number; unitPriceCents: number; note?: string }[];
   last4: string;
   skipPayment?: boolean;
   requiresAction?: boolean;
@@ -65,6 +65,7 @@ export function PublicSite({
   const [deliveryState, setDeliveryState] = useState("");
   const [deliveryPostalCode, setDeliveryPostalCode] = useState("");
   const [notes, setNotes] = useState("");
+  const [lineNotes, setLineNotes] = useState<Record<number, string>>({});
   const [smsOptIn, setSmsOptIn] = useState(false);
   const [stripeReady, setStripeReady] = useState(false);
   const stripeRef = useRef<StripeInstance | null>(null);
@@ -143,6 +144,18 @@ export function PublicSite({
       else next[id] = Math.min(25, quantity);
       return next;
     });
+    if (quantity <= 0) {
+      setLineNotes((current) => {
+        if (!(id in current)) return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+    }
+  }
+
+  function setLineNote(id: number, note: string) {
+    setLineNotes((current) => ({ ...current, [id]: note }));
   }
 
   function orderPayload(extra: Record<string, unknown>) {
@@ -161,7 +174,11 @@ export function PublicSite({
         postalCode: deliveryPostalCode,
       },
       businessSlug,
-      lines: lines.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity })),
+      lines: lines.map((line) => ({
+        menuItemId: line.item.id,
+        quantity: line.quantity,
+        note: lineNotes[line.item.id] ?? "",
+      })),
       ...extra,
     };
   }
@@ -369,33 +386,46 @@ export function PublicSite({
                   <p className="text-sm text-background/75">Add a meal from the menu to start an order.</p>
                 ) : (
                   lines.map((line) => (
-                    <div key={line.item.id} className="flex items-center justify-between gap-3 text-sm">
-                      <div>
-                        <p>{line.item.name}</p>
-                        <p className="text-[#5c5e62]">{formatMoney(line.item.priceCents)} each</p>
+                    <div key={line.item.id} className="grid gap-2 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p>{line.item.name}</p>
+                          <p className="text-[#5c5e62]">{formatMoney(line.item.priceCents)} each</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="size-8 rounded bg-white"
+                            onClick={() => setQuantity(line.item.id, line.quantity - 1)}
+                            aria-label={`Remove one ${line.item.name}`}
+                          >
+                            −
+                          </button>
+                          <span className="w-6 text-center">{line.quantity}</span>
+                          <button
+                            type="button"
+                            className="size-8 rounded bg-white"
+                            onClick={() => setQuantity(line.item.id, line.quantity + 1)}
+                            aria-label={`Add one ${line.item.name}`}
+                          >
+                            +
+                          </button>
+                          <span className="w-16 text-right">
+                            {formatMoney(line.item.priceCents * line.quantity)}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          className="size-8 rounded bg-white"
-                          onClick={() => setQuantity(line.item.id, line.quantity - 1)}
-                          aria-label={`Remove one ${line.item.name}`}
-                        >
-                          −
-                        </button>
-                        <span className="w-6 text-center">{line.quantity}</span>
-                        <button
-                          type="button"
-                          className="size-8 rounded bg-white"
-                          onClick={() => setQuantity(line.item.id, line.quantity + 1)}
-                          aria-label={`Add one ${line.item.name}`}
-                        >
-                          +
-                        </button>
-                        <span className="w-16 text-right">
-                          {formatMoney(line.item.priceCents * line.quantity)}
-                        </span>
-                      </div>
+                      <label className="grid gap-1">
+                        <span className="text-[#5c5e62]">Alteration</span>
+                        <Input
+                          value={lineNotes[line.item.id] ?? ""}
+                          onChange={(event) => setLineNote(line.item.id, event.target.value)}
+                          maxLength={200}
+                          placeholder="No onion, sauce on the side"
+                          aria-label={`Alteration for ${line.item.name}`}
+                          className="h-10 rounded border-0 bg-white shadow-none"
+                        />
+                      </label>
                     </div>
                   ))
                 )}
@@ -436,11 +466,12 @@ export function PublicSite({
                     </a>
                   </p>
                 ) : null}
-                <ul className="mt-4 grid gap-1 text-sm">
-                  {confirmation.items.map((item) => (
-                    <li key={item.name} className="flex justify-between gap-3">
+                <ul className="mt-4 grid gap-2 text-sm">
+                  {confirmation.items.map((item, index) => (
+                    <li key={`${item.name}-${index}`} className="flex justify-between gap-3">
                       <span>
                         {item.quantity} × {item.name}
+                        {item.note ? <span className="block text-[#5c5e62]">{item.note}</span> : null}
                       </span>
                       <span>{formatMoney(item.unitPriceCents * item.quantity)}</span>
                     </li>
