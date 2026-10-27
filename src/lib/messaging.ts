@@ -41,8 +41,19 @@ export function toE164(phone: string) {
   const digits = phone.replace(/\D/g, "");
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  if (digits.length >= 10 && digits.length <= 15) return `+${digits}`;
+  // 12–15 digits can be a real international number. An 11-digit value that
+  // does not start with 1 is not US E.164, and sending "+" plus those digits
+  // makes Twilio reject it as an invalid To number.
+  if (digits.length >= 12 && digits.length <= 15) return `+${digits}`;
   return null;
+}
+
+function unusableNumber(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 11 && !digits.startsWith("1")) {
+    return "That phone number has 11 digits and does not start with 1, so it was not sent.";
+  }
+  return "That phone number is not a full number.";
 }
 
 function nationalNumber(phone: string) {
@@ -140,7 +151,7 @@ async function readError(response: Response) {
 
 export async function sendTextMessage(credentials: TextCredentials, to: string, body: string) {
   const destination = toE164(to);
-  if (!destination) return { ok: false as const, detail: "That phone number is not a full number." };
+  if (!destination) return { ok: false as const, detail: unusableNumber(to) };
   try {
     if (credentials.platform === "twilio") {
       const payload = new URLSearchParams({ To: destination, From: credentials.fromNumber, Body: body });
