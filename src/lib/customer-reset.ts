@@ -1,27 +1,48 @@
-import { randomInt } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { getHomepageBusiness, rememberedOrigin } from "./businesses";
-import { checkPassword, ensureAccounts, hashPassword, writeCookie } from "./customer-auth";
+import { ensureAccounts, hashPassword, writeCookie } from "./customer-auth";
 import { getDb } from "./db";
-import { deliverText } from "./texts";
+import { sendAccountEmail } from "./mail";
 
-const RESET_MINUTES = 15;
+const RESET_MINUTES = 60;
 
 function digits(phone: string) {
   return phone.replace(/\D/g, "");
+}
+
+function validEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function accountForPhone(businessId: number, phone: string) {
   const key = digits(phone);
   const rows = getDb()
     .prepare(
-      `SELECT a.id, c.name, c.phone
+      `SELECT a.id, a.email, c.phone
        FROM customer_accounts a
        JOIN customers c ON c.id = a.customer_id
        WHERE a.business_id = ?
        ORDER BY a.id DESC`,
     )
-    .all(businessId) as { id: number; name: string; phone: string }[];
+    .all(businessId) as { id: number; email: string; phone: string }[];
   return rows.find((row) => digits(row.phone) === key) ?? null;
+}
+
+function tokenHash(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function resetLink(requestUrl: string, businessId: number, token: string) {
+  const requested = requestUrl.replace(/\/account\/reset.*$/, "").replace(/\/+$/, "");
+  let host = "";
+  try {
+    host = new URL(requested).hostname;
+  } catch {
+    host = "";
+  }
+  const local = host === "localhost" || host === "127.0.0.1";
+  const origin = (local ? requested : rememberedOrigin(businessId) || requested).replace(/\/+$/, "");
+  return `${origin}/account/reset?token=${encodeURIComponent(token)}`;
 }
 
 export async function requestPasswordReset(input: { phone: string; linkUrl: string }) {
@@ -31,51 +52,59 @@ export async function requestPasswordReset(input: { phone: string; linkUrl: stri
   const business = getHomepageBusiness();
   const account = accountForPhone(business.id, phone);
   if (!account) return { ok: false as const, error: "No account uses that phone number." };
+  const email = account.email.trim().toLowerCase();
+  if (!validEmail(email)) {
+    return { ok: false as const, error: "That account has no email address, so no reset link was sent." };
+  }
 
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  const token = randomBytes(32).toString("base64url");
   const expires = new Date(Date.now() + RESET_MINUTES * 60 * 1000).toISOString();
   getDb()
     .prepare("UPDATE customer_accounts SET reset_code_hash = ?, reset_expires_at = ? WHERE id = ?")
-    .run(hashPassword(code), expires, account.id);
+    .run(tokenHash(token), expires, account.id);
 
-  const origin = rememberedOrigin(business.id);
-  const linkUrl = origin ? `${origin}/account/reset` : input.linkUrl;
-  const body = `${business.name}: Your password reset code is ${code}. It expires in ${RESET_MINUTES} minutes. Set a new password at ${linkUrl}`;
-  const sent = await deliverText({
-    businessId: business.id,
-    name: account.name,
-    phone: account.phone,
-    body,
-    linkUrl,
+  const link = resetLink(input.linkUrl, business.id, token);
+  const sent = await sendAccountEmail({
+    to: email,
+    subject: `Reset your ${business.name} password`,
+    text: `Set a new password for your ${business.name} account:\n${link}\n\nThis link expires in ${RESET_MINUTES} minutes. If you did not ask for this, you can ignore this email.`,
   });
   if (!sent.ok) {
     getDb()
       .prepare("UPDATE customer_accounts SET reset_code_hash = '', reset_expires_at = '' WHERE id = ?")
       .run(account.id);
-    return { ok: false as const, error: `The reset text could not be sent. ${sent.detail}` };
+    return { ok: false as const, error: sent.error };
   }
-  return { ok: true as const, phone: account.phone, logged: sent.mode === "logged" };
+  return { ok: true as const, logged: sent.mode === "logged" };
 }
 
-export async function resetCustomerPassword(input: { phone: string; code: string; password: string }) {
-  ensureAccounts();
-  const code = input.code.trim();
-  if (!/^\d{6}$/.test(code)) return { ok: false as const, error: "Enter the 6-digit code from the text." };
-  if (input.password.length < 8) return { ok: false as const, error: "Use a password of at least 8 characters." };
+function accountForToken(token: string) {
+  const trimmed = token.trim();
+  if (!trimmed) return null;
   const business = getHomepageBusiness();
-  const account = accountForPhone(business.id, input.phone);
-  if (!account) return { ok: false as const, error: "No account uses that phone number." };
   const row = getDb()
-    .prepare("SELECT reset_code_hash AS hash, reset_expires_at AS expires FROM customer_accounts WHERE id = ?")
-    .get(account.id) as { hash: string; expires: string };
-  if (!row.hash || !row.expires || new Date(row.expires).getTime() < Date.now()) {
-    return { ok: false as const, error: "That code has expired. Request a new one." };
-  }
-  if (!checkPassword(code, row.hash)) return { ok: false as const, error: "That code does not match." };
-  getDb()
     .prepare(
-      "UPDATE customer_accounts SET password_hash = ?, reset_code_hash = '', reset_expires_at = '' WHERE id = ?",
+      `SELECT id, reset_expires_at AS expires
+       FROM customer_accounts
+       WHERE business_id = ? AND reset_code_hash = ?`,
     )
+    .get(business.id, tokenHash(trimmed)) as { id: number; expires: string } | undefined;
+  if (!row?.expires || new Date(row.expires).getTime() < Date.now()) return null;
+  return row;
+}
+
+export function resetTokenValid(token: string) {
+  ensureAccounts();
+  return Boolean(accountForToken(token));
+}
+
+export async function resetCustomerPassword(input: { token: string; password: string }) {
+  ensureAccounts();
+  if (input.password.length < 8) return { ok: false as const, error: "Use a password of at least 8 characters." };
+  const account = accountForToken(input.token);
+  if (!account) return { ok: false as const, error: "That reset link is invalid or has expired. Request a new one." };
+  getDb()
+    .prepare("UPDATE customer_accounts SET password_hash = ?, reset_code_hash = '', reset_expires_at = '' WHERE id = ?")
     .run(hashPassword(input.password), account.id);
   await writeCookie(account.id);
   return { ok: true as const };

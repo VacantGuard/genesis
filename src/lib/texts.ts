@@ -22,52 +22,6 @@ function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
 }
 
-/** One text through the same campaign log and provider path as menu texts. */
-export async function deliverText(input: {
-  businessId: number;
-  name: string;
-  phone: string;
-  body: string;
-  linkUrl: string;
-}) {
-  const db = getDb();
-  const createdAt = new Date().toISOString();
-  const credentials = textCredentials(input.businessId);
-  const recorded = db.transaction(() => {
-    const campaign = db
-      .prepare(
-        `INSERT INTO campaigns
-          (message, link_url, include_customers, include_company_contacts, recipient_count, created_at, business_id)
-         VALUES (?, ?, 0, 0, 1, ?, ?)`,
-      )
-      .run(input.body, input.linkUrl, createdAt, input.businessId);
-    const campaignId = Number(campaign.lastInsertRowid);
-    const logged = db
-      .prepare(
-        `INSERT INTO sms_log
-          (campaign_id, recipient_name, recipient_kind, phone, body, status, detail, created_at)
-         VALUES (?, ?, 'customer', ?, ?, 'logged', '', ?)`,
-      )
-      .run(campaignId, input.name, input.phone, input.body, createdAt);
-    return { campaignId, logId: Number(logged.lastInsertRowid) };
-  })();
-
-  if (!credentials) {
-    return { ok: true as const, mode: "logged" as const, campaignId: recorded.campaignId };
-  }
-
-  const result = await sendTextMessage(credentials, input.phone, input.body);
-  db.prepare("UPDATE sms_log SET status = ?, detail = ? WHERE id = ?").run(
-    result.ok ? "sent" : "failed",
-    result.ok ? result.detail : result.detail,
-    recorded.logId,
-  );
-  if (!result.ok) {
-    return { ok: false as const, mode: "failed" as const, detail: result.detail, campaignId: recorded.campaignId };
-  }
-  return { ok: true as const, mode: "sent" as const, campaignId: recorded.campaignId };
-}
-
 export async function sendCampaign(input: {
   businessId: number;
   message: string;

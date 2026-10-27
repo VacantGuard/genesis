@@ -7,7 +7,7 @@ import { requestPasswordReset, resetCustomerPassword } from "./customer-reset";
 
 export type AccountFormState = { error: string };
 
-export type ResetRequestState = { error: string; phone: string; logged: boolean };
+export type ResetRequestState = { error: string; sent: boolean; logged: boolean };
 
 async function requestOrigin() {
   const headerStore = await headers();
@@ -47,8 +47,8 @@ export async function requestResetAction(_state: ResetRequestState, formData: Fo
     phone: String(formData.get("phone") ?? ""),
     linkUrl: `${await requestOrigin()}/account/reset`,
   });
-  if (!result.ok) return { error: result.error, phone: "", logged: false };
-  return { error: "", phone: result.phone, logged: result.logged };
+  if (!result.ok) return { error: result.error, sent: false, logged: false };
+  return { error: "", sent: true, logged: result.logged };
 }
 
 export async function confirmResetAction(_state: AccountFormState, formData: FormData): Promise<AccountFormState> {
@@ -56,8 +56,7 @@ export async function confirmResetAction(_state: AccountFormState, formData: For
   const confirm = String(formData.get("confirm") ?? "");
   if (password !== confirm) return { error: "Those passwords do not match." };
   const result = await resetCustomerPassword({
-    phone: String(formData.get("phone") ?? ""),
-    code: String(formData.get("code") ?? ""),
+    token: String(formData.get("token") ?? ""),
     password,
   });
   if (!result.ok) return { error: result.error };

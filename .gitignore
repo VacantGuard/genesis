@@ -47,3 +47,4 @@ next-env.d.ts
 /data/*.sqlite-*
 /data/*.db
 /data/*.db-*
+/data/last-password-reset.txt

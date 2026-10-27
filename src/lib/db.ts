@@ -55,7 +55,7 @@ function loadLocalEnv() {
       const eq = trimmed.indexOf("=");
       if (eq <= 0) continue;
       const key = trimmed.slice(0, eq).trim();
-      if (!/^TURSO_[A-Z0-9_]+$/.test(key)) continue;
+      if (!/^(TURSO|SMTP)_[A-Z0-9_]+$/.test(key)) continue;
       if (process.env[key]) continue;
       let value = trimmed.slice(eq + 1).trim();
       if (
