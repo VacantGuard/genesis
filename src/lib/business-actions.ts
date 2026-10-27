@@ -7,6 +7,7 @@ import { saveAgentWebhook } from "@/lib/agent";
 import { saveTextSettings } from "@/lib/messaging";
 import { setPublicOrigin, setSlackConnection } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
+import { getMenuTextSchedule, parseClock, parseWeekday, saveMenuTextSchedule, scheduleReport } from "@/lib/menu-schedule";
 import { saveStripeSettings } from "@/lib/stripe";
 
 function field(formData: FormData, key: string) {
@@ -76,6 +77,33 @@ export async function saveStripeAction(formData: FormData) {
     ? "Stripe is disconnected. Customer checkout will not charge a card."
     : "Stripe is connected. Customer checkout charges cards for this business.";
   redirect(`/terminal/profile?saved=${encodeURIComponent(message)}`);
+}
+
+export async function saveWeeklyMenuTextAction(formData: FormData) {
+  const business = await currentBusiness();
+  await requireSession();
+  const current = getMenuTextSchedule(business.id);
+  const weekday = parseWeekday(field(formData, "weekday"));
+  const clock = parseClock(field(formData, "time"));
+  if (weekday === null || !clock) {
+    bounce("/terminal/campaigns", "Pick a send day and a send time.");
+  }
+  const turnOff = field(formData, "turnOff") === "off";
+  let schedule;
+  try {
+    schedule = saveMenuTextSchedule(business.id, {
+      enabled: turnOff ? false : true,
+      weekday,
+      hour: clock.hour,
+      minute: clock.minute,
+      timezone: current.timezone || "America/Chicago",
+      message: field(formData, "message"),
+    });
+  } catch (error) {
+    bounce("/terminal/campaigns", error instanceof Error ? error.message : "The weekly menu text could not be saved.");
+  }
+  revalidatePath("/terminal/campaigns");
+  redirect(`/terminal/campaigns?saved=${encodeURIComponent(scheduleReport(schedule).summary)}`);
 }
 
 export async function saveSlackAction(formData: FormData) {

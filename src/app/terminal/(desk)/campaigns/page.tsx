@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { CampaignComposer } from "@/components/terminal/campaign-composer";
 import { Flash } from "@/components/flash";
 import { TextPlatformForm } from "@/components/terminal/text-platform-form";
+import { WeeklyTextForm } from "@/components/terminal/weekly-text-form";
 import { Badge } from "@/components/ui/badge";
 import { currentBusiness } from "@/lib/current-business";
 import { listCompanies, listCustomers } from "@/lib/directory";
@@ -28,7 +29,8 @@ export default async function CampaignsPage({
   const sticky = rememberedOrigin(business.id);
   const menuUrl = menuLink(business.slug, sticky || `${proto}://${host}`);
   const textingReady = texting.ready;
-  const weeklyText = scheduleReport(getMenuTextSchedule(business.id));
+  const weeklySchedule = getMenuTextSchedule(business.id);
+  const weeklyText = scheduleReport(weeklySchedule);
 
   return (
     <>
@@ -41,6 +43,7 @@ export default async function CampaignsPage({
       </div>
       <Flash error={query.error} saved={query.saved} />
       <p className="max-w-2xl text-sm">{weeklyText.summary}</p>
+      <WeeklyTextForm schedule={weeklySchedule} />
       <TextPlatformForm settings={texting} />
       <CampaignComposer
         customers={customers}

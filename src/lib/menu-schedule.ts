@@ -2,7 +2,9 @@ import { getDb } from "./db";
 import { menuLink, rememberedOrigin } from "./businesses";
 import { sendCampaign } from "./texts";
 
-const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
+export const MENU_TEXT_WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
+
+const WEEKDAYS = MENU_TEXT_WEEKDAYS;
 
 export type MenuTextSchedule = {
   enabled: boolean;
