@@ -235,6 +235,30 @@ export function listTriggers(businessId: number): MenuTrigger[] {
   }));
 }
 
+export async function postAgentWebhook(businessId: number, body: Record<string, unknown>) {
+  const settings = agentSettings(businessId);
+  if (!settings.webhookUrl) {
+    return { delivery: "not_connected" as const, detail: "No n8n webhook is saved on the Agent page." };
+  }
+  try {
+    const response = await fetch(settings.webhookUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) {
+      return { delivery: "failed" as const, detail: `n8n returned ${response.status}.` };
+    }
+    return { delivery: "sent" as const, detail: "" };
+  } catch (error) {
+    return {
+      delivery: "failed" as const,
+      detail: error instanceof Error ? error.message : "The n8n webhook could not be reached.",
+    };
+  }
+}
+
 export async function publishMenuUpdate(input: { business: BusinessRecord; summary: string; origin?: string }) {
   ensureAgentSchema();
   const menuUrl = menuLink(input.business.slug, input.origin);
@@ -248,37 +272,20 @@ export async function publishMenuUpdate(input: { business: BusinessRecord; summa
     .run(input.business.id, input.summary, menuUrl, JSON.stringify(clients), createdAt);
   const triggerId = Number(inserted.lastInsertRowid);
   const board = orderBoard(input.business.id);
-  const settings = agentSettings(input.business.id);
-  let delivery: MenuTrigger["delivery"] = settings.webhookUrl ? "sent" : "not_connected";
-  let detail = settings.webhookUrl ? "" : "No n8n webhook is saved on the Agent page.";
-  if (settings.webhookUrl) {
-    try {
-      const response = await fetch(settings.webhookUrl, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          event: "menu.updated",
-          triggerId,
-          business: input.business.name,
-          slug: input.business.slug,
-          slackTeamId: input.business.slackTeamId,
-          summary: input.summary,
-          menuUrl,
-          clients,
-          ordered: board.ordered,
-          notOrdered: board.notOrdered,
-        }),
-        signal: AbortSignal.timeout(8000),
-      });
-      if (!response.ok) {
-        delivery = "failed";
-        detail = `n8n returned ${response.status}.`;
-      }
-    } catch (error) {
-      delivery = "failed";
-      detail = error instanceof Error ? error.message : "The n8n webhook could not be reached.";
-    }
-  }
-  getDb().prepare("UPDATE menu_triggers SET delivery = ?, detail = ? WHERE id = ?").run(delivery, detail, triggerId);
-  return { triggerId, delivery, detail, clientCount: clients.length, menuUrl };
+  const posted = await postAgentWebhook(input.business.id, {
+    event: "menu.updated",
+    triggerId,
+    business: input.business.name,
+    slug: input.business.slug,
+    slackTeamId: input.business.slackTeamId,
+    summary: input.summary,
+    menuUrl,
+    clients,
+    ordered: board.ordered,
+    notOrdered: board.notOrdered,
+  });
+  getDb()
+    .prepare("UPDATE menu_triggers SET delivery = ?, detail = ? WHERE id = ?")
+    .run(posted.delivery, posted.detail, triggerId);
+  return { triggerId, delivery: posted.delivery, detail: posted.detail, clientCount: clients.length, menuUrl };
 }

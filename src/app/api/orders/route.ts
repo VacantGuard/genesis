@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getBusinessBySlug, getHomepageBusiness } from "@/lib/businesses";
 import { OrderError } from "@/lib/db";
 import { readDeliveryAddress, validateDeliveryAddress } from "@/lib/delivery";
-import { cleanLineNote, placeOrder, priceOrderLines } from "@/lib/orders";
+import { recordPaidOrder } from "@/lib/order-alert";
+import { cleanLineNote, priceOrderLines } from "@/lib/orders";
 import { chargeCard, paidIntent, stripeSettings } from "@/lib/stripe";
 
 export const runtime = "nodejs";
@@ -160,7 +161,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const order = placeOrder(business.id, {
+    const saved = await recordPaidOrder(business.id, {
       customerName,
       phone,
       email,
@@ -172,7 +173,16 @@ export async function POST(request: Request) {
       delivery,
       lines: orderLines,
     });
-    return NextResponse.json({ ...order, skipPayment, last4: cardLast4 });
+    return NextResponse.json({
+      orderNumber: saved.orderNumber,
+      totalCents: saved.totalCents,
+      customerName: saved.customerName,
+      deliveryAddress: saved.deliveryAddress,
+      deliveryLocateUrl: saved.deliveryLocateUrl,
+      items: saved.items,
+      skipPayment,
+      last4: cardLast4,
+    });
   } catch (error) {
     if (error instanceof OrderError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

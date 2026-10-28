@@ -106,13 +106,14 @@ function savedOrder(db: ReturnType<typeof getDb>, orderId: number) {
   ensureOrderDeliveryColumns(db);
   const row = db
     .prepare(
-      `SELECT order_number AS orderNumber, customer_name AS customerName, total_cents AS totalCents,
+      `SELECT id, order_number AS orderNumber, customer_name AS customerName, total_cents AS totalCents,
               delivery_line1 AS deliveryLine1, delivery_line2 AS deliveryLine2, delivery_city AS deliveryCity,
               delivery_state AS deliveryState, delivery_postal_code AS deliveryPostalCode
        FROM orders WHERE id = ?`,
     )
     .get(orderId) as
     | {
+        id: number;
         orderNumber: string;
         customerName: string;
         totalCents: number;
@@ -133,6 +134,8 @@ function savedOrder(db: ReturnType<typeof getDb>, orderId: number) {
     .all(orderId) as { name: string; quantity: number; unitPriceCents: number; note: string }[];
   const delivery = withDelivery(row);
   return {
+    id: row.id,
+    created: false,
     orderNumber: row.orderNumber,
     totalCents: row.totalCents,
     customerName: row.customerName,
@@ -221,6 +224,8 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
       });
     }
     return {
+      id: orderId,
+      created: true,
       orderNumber,
       totalCents,
       customerName: input.customerName,

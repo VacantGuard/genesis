@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { OrderError } from "@/lib/db";
 import { readDeliveryAddress } from "@/lib/delivery";
-import { cleanLineNote, placeOrder, priceOrderLines } from "@/lib/orders";
+import { recordPaidOrder } from "@/lib/order-alert";
+import { cleanLineNote, priceOrderLines } from "@/lib/orders";
 import { businessIdForWebhook, paidIntent } from "@/lib/stripe";
 
 export const runtime = "nodejs";
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
       state: paid.metadata.state,
       postalCode: paid.metadata.postalCode,
     });
-    placeOrder(businessId, {
+    await recordPaidOrder(businessId, {
       customerName: paid.metadata.customerName || "Customer",
       phone: paid.metadata.phone || "",
       email: paid.metadata.email || "",
