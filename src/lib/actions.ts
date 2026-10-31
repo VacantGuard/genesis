@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import {
   clearSessionCookie,
   credentialsMatch,
@@ -168,8 +168,10 @@ function storeMealPhoto(businessId: number, menuItemId: number, photo: { bytes: 
     }
     if (photo.remove) clearMealPhoto(businessId, menuItemId);
   } catch (error) {
+    unstable_rethrow(error);
     if (error instanceof OrderError) bounce("/terminal/menu", error.message);
-    throw error;
+    console.error("Meal photo save failed", error);
+    bounce("/terminal/menu", "That photo could not be saved. Use a smaller jpg or png.");
   }
 }
 

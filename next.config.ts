@@ -2,10 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["libsql"],
-  serverActions: {
-    bodySizeLimit: "5mb",
-  },
   experimental: {
+    serverActions: {
+      // Vercel refuses request bodies over 4.5 MB. Stay under that.
+      bodySizeLimit: "4mb",
+    },
     staleTimes: {
       dynamic: 0,
     },
