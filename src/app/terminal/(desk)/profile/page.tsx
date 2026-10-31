@@ -6,8 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { saveProfileAction } from "@/lib/actions";
 import { rememberedOrigin } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
-import { saveStripeAction } from "@/lib/business-actions";
+import { saveStripeAction, saveZelleAction } from "@/lib/business-actions";
 import { stripeSettings } from "@/lib/stripe";
+import { zelleDraft } from "@/lib/zelle";
 
 export default async function ProfilePage({
   searchParams,
@@ -17,6 +18,7 @@ export default async function ProfilePage({
   const query = await searchParams;
   const profile = await currentBusiness();
   const stripe = stripeSettings(profile.id);
+  const zelle = zelleDraft(profile.id);
   const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") || headerStore.get("host") || "";
   const local = host.startsWith("localhost") || host.startsWith("127.0.0.1");
@@ -49,10 +51,44 @@ export default async function ProfilePage({
       </form>
 
       <section className="grid max-w-2xl gap-3 border-t pt-6">
+        <h2 className="font-heading text-2xl tracking-tight">Zelle</h2>
+        <p className="text-sm text-muted-foreground">
+          Customers who pay with Zelle send the order total to this name and email or mobile number.
+          The order is not marked paid until someone on this desk confirms the transfer. Leave the
+          email or phone blank to hide Zelle on the public menu.
+        </p>
+        <form action={saveZelleAction} className="grid gap-3">
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">Name customers see</span>
+            <Input
+              name="name"
+              defaultValue={zelle.name}
+              placeholder={profile.name}
+              className="h-10 bg-card"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">Zelle email or mobile number</span>
+            <Input
+              name="handle"
+              defaultValue={zelle.handle}
+              placeholder="kitchen@tigeats.com"
+              autoComplete="off"
+              className="h-10 bg-card"
+            />
+          </label>
+          <div>
+            <Button type="submit">Save Zelle</Button>
+          </div>
+        </form>
+      </section>
+
+      <section className="grid max-w-2xl gap-3 border-t pt-6">
         <h2 className="font-heading text-2xl tracking-tight">Stripe</h2>
         <p className="text-sm text-muted-foreground">
-          This is how {profile.name} takes card payments. Customer checkout on the public menu charges
-          the card through this Stripe account, then the paid order shows on Orders.
+          This is how {profile.name} takes Apple Pay and card payments. Customer checkout on the public
+          menu charges through this Stripe account, then the paid order shows on Orders. Apple Pay
+          shows when the customer’s browser can use it and the domain is registered in Stripe.
         </p>
         {stripe.connected ? (
           <p className="text-sm font-medium">Stripe is connected.</p>

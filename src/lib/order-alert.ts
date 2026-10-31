@@ -14,6 +14,7 @@ export function orderSlackSummary(input: {
   items: AlertItem[];
   totalCents: number;
   deliveryAddress: string;
+  paymentNote?: string;
 }) {
   const items = input.items
     .map((item) => {
@@ -23,7 +24,8 @@ export function orderSlackSummary(input: {
     })
     .join(", ");
   const drop = input.deliveryAddress ? ` to ${input.deliveryAddress}` : "";
-  return `${input.businessName} has a new order ${input.orderNumber}. ${input.customerName}, ${input.phone}. Delivery${drop}. ${items}. Total ${formatMoney(input.totalCents)}.`;
+  const payment = input.paymentNote ? ` ${input.paymentNote}` : "";
+  return `${input.businessName} has a new order ${input.orderNumber}. ${input.customerName}, ${input.phone}. Delivery${drop}. ${items}. Total ${formatMoney(input.totalCents)}.${payment}`;
 }
 
 async function notifyNewOrder(
@@ -36,6 +38,7 @@ async function notifyNewOrder(
     items: AlertItem[];
     totalCents: number;
     deliveryAddress: string;
+    paymentNote?: string;
   },
 ) {
   const business = getBusiness(businessId);
@@ -48,6 +51,7 @@ async function notifyNewOrder(
     items: order.items,
     totalCents: order.totalCents,
     deliveryAddress: order.deliveryAddress,
+    paymentNote: order.paymentNote,
   });
   const posted = await postAgentWebhook(business.id, {
     event: "order.created",
@@ -84,6 +88,28 @@ export async function recordPaidOrder(businessId: number, input: NewOrderInput) 
         items: order.items,
         totalCents: order.totalCents,
         deliveryAddress: order.deliveryAddress,
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  return order;
+}
+
+/** Records a Zelle order that is not paid until staff confirm the transfer. */
+export async function recordZelleOrder(businessId: number, input: NewOrderInput) {
+  const order = placeOrder(businessId, { ...input, orderStatus: "zelle", cardLast4: "Zelle" });
+  if (order.created) {
+    try {
+      await notifyNewOrder(businessId, {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        customerName: order.customerName,
+        phone: input.phone,
+        items: order.items,
+        totalCents: order.totalCents,
+        deliveryAddress: order.deliveryAddress,
+        paymentNote: "Payment is Zelle. Confirm the transfer before treating this order as paid.",
       });
     } catch (error) {
       console.error(error);

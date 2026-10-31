@@ -20,7 +20,9 @@ type PaymentIntent = {
   client_secret?: string | null;
   metadata?: Record<string, string>;
   last_payment_error?: { message?: string };
-  latest_charge?: { payment_method_details?: { card?: { last4?: string } } } | string | null;
+  latest_charge?: {
+    payment_method_details?: { card?: { last4?: string; wallet?: { type?: string } } };
+  } | string | null;
 };
 
 function ensureStripeColumns() {
@@ -140,10 +142,59 @@ async function stripeRequest(secretKey: string, path: string, method: "GET" | "P
   return json;
 }
 
-function last4Of(intent: PaymentIntent) {
+function paymentDetails(intent: PaymentIntent) {
   const charge = intent.latest_charge;
-  if (!charge || typeof charge === "string") return "";
-  return charge.payment_method_details?.card?.last4 || "";
+  if (!charge || typeof charge === "string") return { last4: "", wallet: "" };
+  const card = charge.payment_method_details?.card;
+  return { last4: card?.last4 || "", wallet: card?.wallet?.type || "" };
+}
+
+function metadataFields(metadata: Record<string, string>) {
+  const fields: Record<string, string> = {};
+  for (const [key, value] of Object.entries(metadata)) {
+    fields[`metadata[${key}]`] = value.slice(0, 500);
+  }
+  return fields;
+}
+
+export async function openCheckout(input: {
+  businessId: number;
+  amountCents: number;
+  paymentIntentId?: string;
+  metadata: Record<string, string>;
+}) {
+  const secretKey = stripeSecret(input.businessId);
+  if (!secretKey) return { ok: false as const, error: "Stripe is not connected, so this checkout cannot take payment." };
+  if (!Number.isInteger(input.amountCents) || input.amountCents < 50) {
+    return { ok: false as const, error: "Stripe can charge this order only when the total is at least $0.50." };
+  }
+  const reusable = ["requires_payment_method", "requires_confirmation", "requires_action"];
+  try {
+    const existingId = input.paymentIntentId?.trim() ?? "";
+    if (/^pi_[A-Za-z0-9]+$/.test(existingId)) {
+      const current = await stripeRequest(secretKey, `payment_intents/${existingId}`, "GET");
+      if (current.metadata?.businessId === String(input.businessId) && reusable.includes(current.status)) {
+        const updated = await stripeRequest(secretKey, `payment_intents/${existingId}`, "POST", {
+          amount: String(input.amountCents),
+          currency: "usd",
+          ...metadataFields(input.metadata),
+        });
+        if (updated.client_secret) {
+          return { ok: true as const, paymentIntentId: updated.id, clientSecret: updated.client_secret };
+        }
+      }
+    }
+    const created = await stripeRequest(secretKey, "payment_intents", "POST", {
+      amount: String(input.amountCents),
+      currency: "usd",
+      "automatic_payment_methods[enabled]": "true",
+      ...metadataFields(input.metadata),
+    });
+    if (!created.client_secret) return { ok: false as const, error: "Checkout could not start." };
+    return { ok: true as const, paymentIntentId: created.id, clientSecret: created.client_secret };
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : "Checkout could not start." };
+  }
 }
 
 export async function chargeCard(input: {
@@ -174,7 +225,14 @@ export async function chargeCard(input: {
   try {
     const intent = await stripeRequest(secretKey, "payment_intents", "POST", fields);
     if (intent.status === "succeeded") {
-      return { ok: true as const, status: "succeeded" as const, paymentIntentId: intent.id, last4: last4Of(intent) };
+      const details = paymentDetails(intent);
+      return {
+        ok: true as const,
+        status: "succeeded" as const,
+        paymentIntentId: intent.id,
+        last4: details.last4,
+        wallet: details.wallet,
+      };
     }
     if (intent.status === "requires_action" && intent.client_secret) {
       return {
@@ -208,11 +266,13 @@ export async function paidIntent(businessId: number, paymentIntentId: string) {
     if (intent.status !== "succeeded") {
       return { ok: false as const, error: intent.last_payment_error?.message || "The card was not charged." };
     }
+    const details = paymentDetails(intent);
     return {
       ok: true as const,
       paymentIntentId: intent.id,
       amountCents: intent.amount,
-      last4: last4Of(intent),
+      last4: details.last4,
+      wallet: details.wallet,
       metadata: intent.metadata ?? {},
     };
   } catch (error) {

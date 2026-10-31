@@ -1,4 +1,5 @@
-import { buttonVariants } from "@/components/ui/button";
+import { markZelleReceivedAction } from "@/lib/actions";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { currentBusiness } from "@/lib/current-business";
 import { formatMoney, formatWhen } from "@/lib/format";
 import { listOrders } from "@/lib/orders";
@@ -11,9 +12,9 @@ export default async function OrdersPage() {
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-heading text-3xl tracking-tight">Paid orders</h1>
+          <h1 className="font-heading text-3xl tracking-tight">Orders</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Meal orders recorded by the practice checkout. Export a CSV for the kitchen.
+            Card and Apple Pay orders are paid through Stripe. A Zelle order stays unpaid until the transfer is marked received.
           </p>
         </div>
         <a href="/terminal/orders/export" className={buttonVariants({ variant: "outline" })}>
@@ -23,7 +24,7 @@ export default async function OrdersPage() {
 
       {orders.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No paid orders yet. Place one from the public POS section.
+          No orders yet. Place one from the public menu.
         </p>
       ) : (
         <div className="grid gap-4">
@@ -55,7 +56,21 @@ export default async function OrdersPage() {
                   ) : null}
                 </p>
               ) : null}
-              <p className="text-sm text-muted-foreground">Card ending {order.cardLast4}</p>
+              <p className="text-sm text-muted-foreground">
+                {order.cardLast4 === "Zelle" && order.status === "zelle"
+                  ? "Zelle — waiting for the transfer"
+                  : order.cardLast4 === "Zelle"
+                    ? "Zelle received"
+                    : `Card ending ${order.cardLast4}`}
+              </p>
+              {order.cardLast4 === "Zelle" && order.status === "zelle" ? (
+                <form action={markZelleReceivedAction}>
+                  <input type="hidden" name="id" value={order.id} />
+                  <Button type="submit" size="sm" variant="outline">
+                    Mark Zelle received
+                  </Button>
+                </form>
+              ) : null}
               {order.notes ? <p className="text-sm">Notes: {order.notes}</p> : null}
               <ul className="grid gap-2 text-sm">
                 {order.items.map((item, index) => (

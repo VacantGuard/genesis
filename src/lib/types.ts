@@ -84,6 +84,7 @@ export type KitchenOrder = {
   companyName: string;
   notes: string;
   cardLast4: string;
+  status: string;
   totalCents: number;
   createdAt: string;
   deliveryLine1: string;

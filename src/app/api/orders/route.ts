@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { getBusinessBySlug, getHomepageBusiness } from "@/lib/businesses";
 import { OrderError } from "@/lib/db";
 import { readDeliveryAddress, validateDeliveryAddress } from "@/lib/delivery";
-import { recordPaidOrder } from "@/lib/order-alert";
+import { recordPaidOrder, recordZelleOrder } from "@/lib/order-alert";
 import { cleanLineNote, priceOrderLines } from "@/lib/orders";
 import { chargeCard, paidIntent, stripeSettings } from "@/lib/stripe";
+import { zelleAccount } from "@/lib/zelle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ type Body = {
     state?: string;
     postalCode?: string;
   };
+  payment?: string;
   paymentMethodId?: string;
   paymentIntentId?: string;
   lines?: { menuItemId?: number; quantity?: number; note?: string }[];
@@ -90,7 +92,52 @@ export async function POST(request: Request) {
   }
 
   let cardLast4 = "";
+  let wallet = "";
   let stripePaymentIntentId = "";
+  let quote;
+  try {
+    quote = priceOrderLines(business.id, orderLines);
+  } catch (error) {
+    if (error instanceof OrderError) return NextResponse.json({ error: error.message }, { status: 400 });
+    throw error;
+  }
+
+  if (clean(body.payment, 20) === "zelle") {
+    const zelle = zelleAccount(business.id);
+    if (!zelle) {
+      return NextResponse.json({ error: "Zelle is not set up on this menu." }, { status: 400 });
+    }
+    try {
+      const saved = await recordZelleOrder(business.id, {
+        customerName,
+        phone,
+        email,
+        companyName,
+        notes,
+        smsOptIn: body.smsOptIn === true,
+        cardLast4: "Zelle",
+        delivery,
+        lines: orderLines,
+      });
+      return NextResponse.json({
+        orderNumber: saved.orderNumber,
+        totalCents: saved.totalCents,
+        customerName: saved.customerName,
+        deliveryAddress: saved.deliveryAddress,
+        deliveryLocateUrl: saved.deliveryLocateUrl,
+        items: saved.items,
+        last4: "Zelle",
+        payment: "zelle",
+        zelleName: zelle.name,
+        zelleHandle: zelle.handle,
+      });
+    } catch (error) {
+      if (error instanceof OrderError) return NextResponse.json({ error: error.message }, { status: 400 });
+      console.error(error);
+      return NextResponse.json({ error: "Could not record the order." }, { status: 500 });
+    }
+  }
+
   {
     const stripe = stripeSettings(business.id);
     if (!stripe.connected) {
@@ -98,13 +145,6 @@ export async function POST(request: Request) {
         { error: "Stripe is not connected, so the card was not charged." },
         { status: 400 },
       );
-    }
-    let quote;
-    try {
-      quote = priceOrderLines(business.id, orderLines);
-    } catch (error) {
-      if (error instanceof OrderError) return NextResponse.json({ error: error.message }, { status: 400 });
-      throw error;
     }
     const metadata: Record<string, string> = {
       businessId: String(business.id),
@@ -134,6 +174,7 @@ export async function POST(request: Request) {
         );
       }
       cardLast4 = paid.last4 || "CARD";
+      wallet = paid.wallet;
       stripePaymentIntentId = paid.paymentIntentId;
     } else if (body.paymentMethodId) {
       const charged = await chargeCard({
@@ -151,6 +192,7 @@ export async function POST(request: Request) {
         });
       }
       cardLast4 = charged.last4 || "CARD";
+      wallet = charged.wallet;
       stripePaymentIntentId = charged.paymentIntentId;
     } else {
       return NextResponse.json({ error: "The card was not charged." }, { status: 400 });
@@ -178,6 +220,7 @@ export async function POST(request: Request) {
       deliveryLocateUrl: saved.deliveryLocateUrl,
       items: saved.items,
       last4: cardLast4,
+      wallet,
     });
   } catch (error) {
     if (error instanceof OrderError) {
