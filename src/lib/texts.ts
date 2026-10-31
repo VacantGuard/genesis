@@ -3,6 +3,15 @@ import { listCompanies, listCustomers } from "./directory.ts";
 import { sendTextMessage, textCredentials, textSettings } from "./messaging.ts";
 import type { Campaign, SmsDelivery } from "./types.ts";
 
+function ensureCampaignMediaColumns() {
+  const db = getDb();
+  const names = new Set(
+    (db.prepare("PRAGMA table_info(campaigns)").all() as { name: string }[]).map((column) => column.name),
+  );
+  if (!names.has("media_url")) db.exec("ALTER TABLE campaigns ADD COLUMN media_url TEXT NOT NULL DEFAULT ''");
+  if (!names.has("media_name")) db.exec("ALTER TABLE campaigns ADD COLUMN media_name TEXT NOT NULL DEFAULT ''");
+}
+
 type SmsRecipient = {
   clientNumber: string;
   name: string;
@@ -29,8 +38,13 @@ export async function sendCampaign(input: {
   includeCustomers: boolean;
   includeCompanyContacts: boolean;
   statusCallbackUrl?: string;
+  mediaUrl?: string;
+  mediaName?: string;
 }) {
+  ensureCampaignMediaColumns();
   const db = getDb();
+  const mediaUrl = input.mediaUrl?.trim() || "";
+  const mediaName = mediaUrl ? input.mediaName?.trim() || "photo" : "";
   const recipients: SmsRecipient[] = [];
   const seen = new Set<string>();
   const push = (recipient: SmsRecipient) => {
@@ -61,8 +75,8 @@ export async function sendCampaign(input: {
     const campaign = db
       .prepare(
         `INSERT INTO campaigns
-          (message, link_url, include_customers, include_company_contacts, recipient_count, created_at, business_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          (message, link_url, include_customers, include_company_contacts, recipient_count, created_at, business_id, media_url, media_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         body,
@@ -72,6 +86,8 @@ export async function sendCampaign(input: {
         recipients.length,
         createdAt,
         input.businessId,
+        mediaUrl,
+        mediaName,
       );
     const campaignId = Number(campaign.lastInsertRowid);
     const log = db.prepare(
@@ -114,7 +130,7 @@ export async function sendCampaign(input: {
   for (let index = 0; index < recorded.ids.length; index += 1) {
     const row = recorded.ids[index];
     const recipient = recipients[index];
-    const result = await sendTextMessage(credentials, row.phone, body, input.statusCallbackUrl);
+    const result = await sendTextMessage(credentials, row.phone, body, input.statusCallbackUrl, mediaUrl || undefined);
     const status = result.delivery;
     if (result.ok) sentCount += 1;
     else failedCount += 1;
@@ -140,13 +156,15 @@ export async function sendCampaign(input: {
 
 export function listCampaigns(businessId: number): Campaign[] {
   textSettings(businessId);
+  ensureCampaignMediaColumns();
   const db = getDb();
   const campaigns = db
     .prepare(
       `SELECT id, message, link_url AS linkUrl,
               include_customers AS includeCustomers,
               include_company_contacts AS includeCompanyContacts,
-              recipient_count AS recipientCount, created_at AS createdAt
+              recipient_count AS recipientCount, created_at AS createdAt,
+              media_url AS mediaUrl, media_name AS mediaName
        FROM campaigns WHERE business_id = ? ORDER BY id DESC`,
     )
     .all(businessId) as (Omit<Campaign, "includeCustomers" | "includeCompanyContacts" | "deliveries"> & {
@@ -166,6 +184,8 @@ export function listCampaigns(businessId: number): Campaign[] {
     includeCompanyContacts: campaign.includeCompanyContacts === 1,
     recipientCount: campaign.recipientCount,
     createdAt: campaign.createdAt,
+    mediaUrl: campaign.mediaUrl || "",
+    mediaName: campaign.mediaName || "",
     deliveries: deliveries.all(campaign.id) as SmsDelivery[],
   }));
 }

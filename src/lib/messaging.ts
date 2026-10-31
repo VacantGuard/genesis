@@ -150,6 +150,17 @@ async function readError(response: Response) {
   return json.message || json.detail || json.error || `The text platform returned ${response.status}.`;
 }
 
+function twilioFailureDetail(
+  json: { message?: string; error_message?: string | null; code?: number },
+  httpStatus: number,
+) {
+  const message = json.error_message || json.message;
+  if (message && json.code) return `${message} (${json.code})`;
+  if (message) return message;
+  if (json.code) return `Twilio error ${json.code}.`;
+  return `Twilio returned ${httpStatus}.`;
+}
+
 export type TextDelivery = "accepted" | "delivered" | "sent" | "failed";
 
 /** Twilio's create call returns queued/sent before the handset confirms delivery. */
@@ -198,13 +209,18 @@ export async function sendTextMessage(
   to: string,
   body: string,
   statusCallback?: string,
+  mediaUrl?: string,
 ) {
   const destination = toE164(to);
   if (!destination) return { ok: false as const, detail: unusableNumber(to), delivery: "failed" as const };
   try {
+    if (mediaUrl && credentials.platform !== "twilio") {
+      return { ok: false as const, detail: "A photo can only be sent through Twilio.", delivery: "failed" as const };
+    }
     if (credentials.platform === "twilio") {
       const payload = new URLSearchParams({ To: destination, From: credentials.fromNumber, Body: body });
       if (statusCallback) payload.set("StatusCallback", statusCallback);
+      if (mediaUrl) payload.set("MediaUrl", mediaUrl);
       const response = await fetch(
         `https://api.twilio.com/2010-04-01/Accounts/${credentials.accountId}/Messages.json`,
         {
@@ -221,17 +237,30 @@ export async function sendTextMessage(
         sid?: string;
         status?: string;
         message?: string;
+        code?: number;
+        error_code?: number | null;
         error_message?: string | null;
       };
-      if (!response.ok) {
-        return { ok: false as const, detail: json.message || json.error_message || `Twilio returned ${response.status}.`, delivery: "failed" as const };
+      const errorCode = json.code || json.error_code || undefined;
+      if (!response.ok || errorCode) {
+        return {
+          ok: false as const,
+          detail: twilioFailureDetail(
+            { message: json.message, error_message: json.error_message, code: errorCode || undefined },
+            response.status,
+          ),
+          delivery: "failed" as const,
+        };
       }
       const delivery = twilioDeliveryStatus(json.status);
       if (delivery === "failed") {
         return {
           ok: false as const,
-          detail: json.error_message || json.message || "Twilio rejected the text before delivery.",
-          delivery,
+          detail: twilioFailureDetail(
+            { message: json.message, error_message: json.error_message || "Twilio rejected the text before delivery." },
+            response.status,
+          ),
+          delivery: "failed" as const,
         };
       }
       return { ok: true as const, detail: json.sid || delivery, delivery };

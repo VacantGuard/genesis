@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { sendCampaignAction } from "@/lib/actions";
 import type { Company, Customer } from "@/lib/types";
@@ -29,6 +29,14 @@ export function CampaignComposer({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (photo) URL.revokeObjectURL(photo.url);
+    };
+  }, [photo]);
 
   const recipients = useMemo(() => {
     const seen = new Set<string>();
@@ -54,32 +62,73 @@ export function CampaignComposer({
     setMessage((current) => (current.includes(menuUrl) ? current : `${current.trim()}\n${menuUrl}`.trim()));
   }
 
+  function clearPhoto() {
+    setPhoto(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function onPhoto(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const type = file.type.toLowerCase();
+    const name = file.name.toLowerCase();
+    const jpeg = type === "image/jpeg" || name.endsWith(".jpg") || name.endsWith(".jpeg");
+    const png = type === "image/png" || name.endsWith(".png");
+    if ((type && type !== "image/jpeg" && type !== "image/png") || (!jpeg && !png)) {
+      setError("Attach a jpg or png.");
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setError("That photo is over 4 MB. Use a smaller jpg or png.");
+      return;
+    }
+    setError("");
+    setPhoto({ file, url: URL.createObjectURL(file) });
+  }
+
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setPending(true);
     setError("");
     setStatus("");
+    let mediaToken = "";
+    if (photo) {
+      const body = new FormData();
+      body.set("photo", photo.file);
+      const response = await fetch("/api/text-media", { method: "POST", body });
+      const json = (await response.json().catch(() => null)) as { token?: string; error?: string } | null;
+      if (!response.ok || !json?.token) {
+        setPending(false);
+        setError(json?.error || "That photo could not be attached.");
+        return;
+      }
+      mediaToken = json.token;
+    }
     const result = await sendCampaignAction({
       message,
       includeCustomers,
       includeCompanyContacts,
+      mediaToken,
     });
     setPending(false);
     if (!result.ok) {
       setError(result.error);
       return;
     }
+    clearPhoto();
     const noun = result.recipientCount === 1 ? "text" : "texts";
+    const withPhoto = mediaToken ? " with the photo" : "";
     const who = platform === "twilio" ? "Twilio" : "The text platform";
     if (result.mode === "logged") {
-      setStatus(`Logged ${result.recipientCount} ${noun}. Connect a text platform above before a phone can receive them.`);
+      setStatus(`Logged ${result.recipientCount} ${noun}${withPhoto}. Connect a text platform above before a phone can receive them.`);
     } else if (result.failedCount > 0) {
       setStatus(
-        `${who} accepted ${result.sentCount}. ${result.failedCount} failed before acceptance. Accepted is not delivery to the phone. The reason is in the history below.`,
+        `${who} accepted ${result.sentCount}${withPhoto}. ${result.failedCount} failed before acceptance. Accepted is not delivery to the phone. The reason is on that text row below.`,
       );
     } else {
       setStatus(
-        `${who} accepted ${result.sentCount} ${noun}. That is not delivery to the phone. The history stays “accepted, not delivered” until the platform reports the phone.`,
+        `${who} accepted ${result.sentCount} ${noun}${withPhoto}. That is not delivery to the phone. The history stays “accepted, not delivered” until the platform reports the phone.`,
       );
     }
     router.refresh();
@@ -131,6 +180,29 @@ export function CampaignComposer({
           maxLength={480}
           required
         />
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+            className="sr-only"
+            onChange={onPhoto}
+          />
+          <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+            {photo ? "Replace photo" : "Attach photo"}
+          </Button>
+          {photo ? (
+            <span className="flex min-w-0 items-center gap-2 text-sm">
+              <img src={photo.url} alt="" className="size-10 rounded-md border object-cover" />
+              <span className="max-w-xs truncate">{photo.file.name}</span>
+              <Button type="button" variant="ghost" size="sm" onClick={clearPhoto}>
+                Remove
+              </Button>
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">Jpg or png, up to 4 MB. No photo stays a text.</span>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground">
           {message.length}/480. The public order link is added if it is missing when you send.
         </p>

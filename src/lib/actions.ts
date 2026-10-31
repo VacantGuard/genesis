@@ -19,7 +19,7 @@ import {
   saveCustomer,
 } from "@/lib/directory";
 import { OrderError } from "@/lib/db";
-import { textStatusCallbackUrl } from "@/lib/messaging";
+import { textSettings, textStatusCallbackUrl } from "@/lib/messaging";
 import { parseDollarsToCents } from "@/lib/format";
 import {
   createCategory,
@@ -30,6 +30,7 @@ import {
   setMenuItemAvailability,
   updateMenuItem,
 } from "@/lib/menu";
+import { findTextPhoto, textPhotoPublicUrl } from "@/lib/text-media";
 import { sendCampaign } from "@/lib/texts";
 
 export type LoginState = { error: string };
@@ -312,6 +313,7 @@ export async function sendCampaignAction(input: {
   message: string;
   includeCustomers: boolean;
   includeCompanyContacts: boolean;
+  mediaToken?: string;
 }): Promise<
   | { ok: true; recipientCount: number; sentCount: number; failedCount: number; linkUrl: string; mode: "sent" | "logged" }
   | { ok: false; error: string }
@@ -328,7 +330,25 @@ export async function sendCampaignAction(input: {
   const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") || headerStore.get("host") || "127.0.0.1:43123";
   const proto = headerStore.get("x-forwarded-proto") || "http";
-  const linkUrl = menuLink(business.slug, `${proto}://${host}`);
+  const origin = `${proto}://${host}`;
+  const linkUrl = menuLink(business.slug, origin);
+  const mediaToken = input.mediaToken?.trim() || "";
+  let mediaUrl = "";
+  let mediaName = "";
+  if (mediaToken) {
+    const photo = findTextPhoto(business.id, mediaToken);
+    if (!photo) return { ok: false, error: "That photo is no longer on this desk. Attach it again." };
+    const settings = textSettings(business.id);
+    if (settings.platform !== "twilio" || !settings.ready) {
+      return {
+        ok: false,
+        error: "Connect Twilio on this page before sending a photo. A text without a photo stays a normal text.",
+      };
+    }
+    mediaUrl = textPhotoPublicUrl(origin, photo);
+    if (!mediaUrl) return { ok: false, error: "This desk has no public address Twilio can use for the photo." };
+    mediaName = photo.filename;
+  }
 
   try {
     const result = await sendCampaign({
@@ -337,7 +357,9 @@ export async function sendCampaignAction(input: {
       linkUrl,
       includeCustomers: input.includeCustomers,
       includeCompanyContacts: input.includeCompanyContacts,
-      statusCallbackUrl: textStatusCallbackUrl(`${proto}://${host}`),
+      statusCallbackUrl: textStatusCallbackUrl(origin),
+      mediaUrl,
+      mediaName,
     });
     revalidatePath("/terminal/campaigns");
     return {

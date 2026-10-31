@@ -113,6 +113,8 @@ export type Campaign = {
   includeCompanyContacts: boolean;
   recipientCount: number;
   createdAt: string;
+  mediaUrl: string;
+  mediaName: string;
   deliveries: SmsDelivery[];
 };
 

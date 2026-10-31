@@ -67,6 +67,18 @@ export default async function CampaignsPage({
                 {campaign.includeCompanyContacts ? <Badge variant="secondary">Companies</Badge> : null}
               </div>
               <p className="text-sm whitespace-pre-wrap">{campaign.message}</p>
+              {campaign.mediaName ? (
+                <div className="flex items-center gap-2 text-sm">
+                  {campaign.mediaUrl ? (
+                    <img
+                      src={campaign.mediaUrl}
+                      alt=""
+                      className="size-10 rounded-md border object-cover"
+                    />
+                  ) : null}
+                  <span>Photo: {campaign.mediaName}</span>
+                </div>
+              ) : null}
               <p className="text-sm">
                 Link included:{" "}
                 <a href={campaign.linkUrl} className="text-primary underline-offset-4 hover:underline">
@@ -75,7 +87,14 @@ export default async function CampaignsPage({
               </p>
               <ul className="grid gap-1 text-sm text-muted-foreground">
                 {campaign.deliveries.map((delivery) => (
-                  <li key={delivery.id}>
+                  <li
+                    key={delivery.id}
+                    className={
+                      delivery.status === "failed" || delivery.status === "undelivered"
+                        ? "text-destructive"
+                        : undefined
+                    }
+                  >
                     {delivery.recipientName} · {delivery.phone} · {textOutcomeLabel(delivery.status)}
                     {delivery.detail ? ` · ${delivery.detail}` : ""}
                   </li>
