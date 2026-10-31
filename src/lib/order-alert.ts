@@ -1,5 +1,6 @@
 import { postAgentWebhook } from "./agent.ts";
 import { getBusiness } from "./businesses.ts";
+import { formatDeliveryDate } from "./delivery-dates.ts";
 import { formatMoney } from "./format.ts";
 import { placeOrder } from "./orders.ts";
 import type { NewOrderInput } from "./db.ts";
@@ -13,6 +14,7 @@ export function orderSlackSummary(input: {
   phone: string;
   items: AlertItem[];
   totalCents: number;
+  deliveryDate?: string;
   deliveryAddress: string;
   paymentNote?: string;
 }) {
@@ -23,9 +25,11 @@ export function orderSlackSummary(input: {
       return note ? `${label} (${note})` : label;
     })
     .join(", ");
+  const when = input.deliveryDate ? formatDeliveryDate(input.deliveryDate) : "";
   const drop = input.deliveryAddress ? ` to ${input.deliveryAddress}` : "";
   const payment = input.paymentNote ? ` ${input.paymentNote}` : "";
-  return `${input.businessName} has a new order ${input.orderNumber}. ${input.customerName}, ${input.phone}. Delivery${drop}. ${items}. Total ${formatMoney(input.totalCents)}.${payment}`;
+  const schedule = when ? ` ${when}` : "";
+  return `${input.businessName} has a new order ${input.orderNumber}. ${input.customerName}, ${input.phone}. Delivery${schedule}${drop}. ${items}. Total ${formatMoney(input.totalCents)}.${payment}`;
 }
 
 async function notifyNewOrder(
@@ -37,6 +41,7 @@ async function notifyNewOrder(
     phone: string;
     items: AlertItem[];
     totalCents: number;
+    deliveryDate?: string;
     deliveryAddress: string;
     paymentNote?: string;
   },
@@ -50,6 +55,7 @@ async function notifyNewOrder(
     phone: order.phone,
     items: order.items,
     totalCents: order.totalCents,
+    deliveryDate: order.deliveryDate,
     deliveryAddress: order.deliveryAddress,
     paymentNote: order.paymentNote,
   });
@@ -70,6 +76,7 @@ async function notifyNewOrder(
     })),
     totalCents: order.totalCents,
     fulfillment: "Delivery",
+    deliveryDate: order.deliveryDate || "",
     deliveryAddress: order.deliveryAddress,
   });
   if (posted.delivery === "failed") console.error("Order Slack alert failed", posted.detail);
@@ -87,6 +94,7 @@ export async function recordPaidOrder(businessId: number, input: NewOrderInput) 
         phone: input.phone,
         items: order.items,
         totalCents: order.totalCents,
+        deliveryDate: order.deliveryDate,
         deliveryAddress: order.deliveryAddress,
       });
     } catch (error) {
@@ -108,6 +116,7 @@ export async function recordZelleOrder(businessId: number, input: NewOrderInput)
         phone: input.phone,
         items: order.items,
         totalCents: order.totalCents,
+        deliveryDate: order.deliveryDate,
         deliveryAddress: order.deliveryAddress,
         paymentNote: "Payment is Zelle. Confirm the transfer before treating this order as paid.",
       });

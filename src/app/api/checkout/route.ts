@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getBusinessBySlug, getHomepageBusiness } from "@/lib/businesses";
 import { OrderError } from "@/lib/db";
 import { readDeliveryAddress, validateDeliveryAddress } from "@/lib/delivery";
+import { deliveryDateError } from "@/lib/delivery-dates";
 import { cleanLineNote, priceOrderLines } from "@/lib/orders";
 import { ensureApplePayDomains, openCheckout } from "@/lib/stripe";
 
@@ -17,6 +18,7 @@ type Body = {
   companyName?: string;
   notes?: string;
   smsOptIn?: boolean;
+  deliveryDate?: string;
   delivery?: {
     line1?: string;
     line2?: string;
@@ -81,6 +83,8 @@ export async function POST(request: Request) {
     }
     const deliveryError = validateDeliveryAddress(delivery);
     if (deliveryError) return NextResponse.json({ error: deliveryError }, { status: 400 });
+    const dateError = deliveryDateError(clean(body.deliveryDate, 10));
+    if (dateError) return NextResponse.json({ error: dateError }, { status: 400 });
   }
 
   let quote;
@@ -104,6 +108,7 @@ export async function POST(request: Request) {
     city: delivery.city,
     state: delivery.state,
     postalCode: delivery.postalCode,
+    deliveryDate: clean(body.deliveryDate, 10),
     lines: orderLines.map((line) => `${line.menuItemId}:${line.quantity}`).join(","),
   };
   for (const line of orderLines) {

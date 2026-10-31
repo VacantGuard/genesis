@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { currentBusiness } from "@/lib/current-business";
 import { ordersForCustomerRecord } from "@/lib/customer-orders";
 import { getCustomer } from "@/lib/directory";
+import { formatDeliveryDate } from "@/lib/delivery-dates";
 import { formatMoney, formatWhen } from "@/lib/format";
 
 export default async function CustomerOrdersPage({ params }: { params: Promise<{ id: string }> }) {
@@ -51,6 +52,9 @@ export default async function CustomerOrdersPage({ params }: { params: Promise<{
                   </li>
                 ))}
               </ul>
+              {order.deliveryDate ? (
+                <p>Delivery {formatDeliveryDate(order.deliveryDate)}</p>
+              ) : null}
               <p className="font-medium">{formatMoney(order.totalCents)}</p>
               {order.notes ? <p className="text-muted-foreground">Notes: {order.notes}</p> : null}
             </article>

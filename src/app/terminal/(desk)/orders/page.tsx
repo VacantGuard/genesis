@@ -1,6 +1,7 @@
 import { markZelleReceivedAction } from "@/lib/actions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { currentBusiness } from "@/lib/current-business";
+import { formatDeliveryDate } from "@/lib/delivery-dates";
 import { formatMoney, formatWhen } from "@/lib/format";
 import { listOrders } from "@/lib/orders";
 
@@ -38,6 +39,9 @@ export default async function OrdersPage() {
                 {order.customerName}
                 {order.companyName ? ` · ${order.companyName}` : ""} · {order.phone} · {order.email}
               </p>
+              {order.deliveryDate ? (
+                <p className="text-sm">Delivery {formatDeliveryDate(order.deliveryDate)}</p>
+              ) : null}
               {order.deliveryAddress ? (
                 <p className="text-sm">
                   Deliver to {order.deliveryAddress}

@@ -27,6 +27,7 @@ export type CustomerOrder = {
   createdAt: string;
   status: string;
   items: string;
+  deliveryDate: string;
 };
 
 export function ensureAccounts() {
@@ -282,6 +283,7 @@ export function ordersForCustomer(account: CustomerAccount): CustomerOrder[] {
       totalCents: order.totalCents,
       createdAt: order.createdAt,
       status: order.status,
+      deliveryDate: order.deliveryDate,
       items: order.items
         .map((line) => `${line.quantity} × ${line.name}${line.note ? ` — ${line.note}` : ""}`)
         .join(", "),

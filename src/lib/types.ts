@@ -87,6 +87,7 @@ export type KitchenOrder = {
   status: string;
   totalCents: number;
   createdAt: string;
+  deliveryDate: string;
   deliveryLine1: string;
   deliveryLine2: string;
   deliveryCity: string;
