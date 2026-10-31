@@ -10,9 +10,11 @@ import {
   deleteCategoryAction,
   deleteMenuItemAction,
   renameCategoryAction,
+  saveMenuWeekAction,
   setAvailabilityAction,
   updateMenuItemAction,
 } from "@/lib/actions";
+import { getMenuWeekNote } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
 import { formatMoney } from "@/lib/format";
 import { listCategories, listMenuItems } from "@/lib/menu";
@@ -26,6 +28,7 @@ export default async function MenuPage({
   const business = await currentBusiness();
   const categories = listCategories(business.id);
   const items = listMenuItems(business.id);
+  const weekNote = getMenuWeekNote(business.id);
 
   return (
     <>
@@ -36,6 +39,25 @@ export default async function MenuPage({
         </p>
       </div>
       <Flash error={query.error} saved={query.saved} />
+
+      <form action={saveMenuWeekAction} className="grid gap-3 rounded-xl border bg-card p-4">
+        <div>
+          <h2 className="font-medium">Week of</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Shown in parentheses under “menu of the week” on the public menu.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Input
+            name="weekOf"
+            defaultValue={weekNote}
+            placeholder="10/19 and 10/22 deliveries"
+            maxLength={80}
+            className="h-10 bg-background sm:max-w-md"
+          />
+          <Button type="submit">Save week</Button>
+        </div>
+      </form>
 
       <form action={createCategoryAction} className="flex flex-col gap-2 sm:flex-row">
         <Input name="name" placeholder="New category" required className="h-10 bg-card sm:max-w-xs" />
@@ -116,6 +138,34 @@ export default async function MenuPage({
                             className="h-10 bg-background"
                           />
                         </label>
+                        <label className="grid gap-1.5 text-sm">
+                          <span className="font-medium">Calories</span>
+                          <Input
+                            name="calories"
+                            type="number"
+                            min={0}
+                            max={9999}
+                            step={1}
+                            inputMode="numeric"
+                            defaultValue={item.calories ?? ""}
+                            placeholder="625"
+                            className="h-10 bg-background"
+                          />
+                        </label>
+                        <label className="grid gap-1.5 text-sm">
+                          <span className="font-medium">Protein (g)</span>
+                          <Input
+                            name="protein"
+                            type="number"
+                            min={0}
+                            max={999}
+                            step={1}
+                            inputMode="numeric"
+                            defaultValue={item.protein ?? ""}
+                            placeholder="45"
+                            className="h-10 bg-background"
+                          />
+                        </label>
                         <label className="flex items-center gap-2 self-end text-sm">
                           <input type="hidden" name="available" value="0" />
                           <input
@@ -159,6 +209,26 @@ export default async function MenuPage({
                   placeholder="Price, e.g. 12.00"
                   inputMode="decimal"
                   required
+                  className="h-10 bg-background"
+                />
+                <Input
+                  name="calories"
+                  type="number"
+                  min={0}
+                  max={9999}
+                  step={1}
+                  inputMode="numeric"
+                  placeholder="Calories, e.g. 625"
+                  className="h-10 bg-background"
+                />
+                <Input
+                  name="protein"
+                  type="number"
+                  min={0}
+                  max={999}
+                  step={1}
+                  inputMode="numeric"
+                  placeholder="Protein grams, e.g. 45"
                   className="h-10 bg-background"
                 />
                 <Textarea

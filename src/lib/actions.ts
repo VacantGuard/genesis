@@ -10,7 +10,7 @@ import {
   setSessionCookie,
 } from "@/lib/auth";
 import { publishMenuUpdate } from "@/lib/agent";
-import { menuLink, updateBusinessProfile, type BusinessRecord } from "@/lib/businesses";
+import { menuLink, setMenuWeekNote, updateBusinessProfile, type BusinessRecord } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
 import {
   deleteCompany,
@@ -135,12 +135,23 @@ export async function deleteCategoryAction(formData: FormData) {
   await tellAgent(business, "A menu category and its meals were removed.", "Category and its meals were removed.");
 }
 
+function wholeNumber(formData: FormData, key: string, label: string, max: number) {
+  const raw = field(formData, key);
+  if (!raw) return null;
+  if (!/^\d+$/.test(raw) || Number(raw) > max) {
+    bounce("/terminal/menu", `${label} needs a whole number up to ${max}.`);
+  }
+  return Number(raw);
+}
+
 function readItem(formData: FormData) {
   const categoryId = optionalId(field(formData, "categoryId"));
   const name = field(formData, "name");
   const description = field(formData, "description");
   const priceCents = parseDollarsToCents(field(formData, "price"));
   const available = checked(formData, "available");
+  const calories = wholeNumber(formData, "calories", "Calories", 9999);
+  const protein = wholeNumber(formData, "protein", "Protein", 999);
   if (!categoryId) bounce("/terminal/menu", "Choose a category.");
   if (name.length < 2 || name.length > 80) {
     bounce("/terminal/menu", "Meal names need 2 to 80 characters.");
@@ -151,7 +162,20 @@ function readItem(formData: FormData) {
   if (priceCents === null) {
     bounce("/terminal/menu", "Enter a price in dollars, such as 14 or 14.50.");
   }
-  return { categoryId, name, description, priceCents, available };
+  return { categoryId, name, description, priceCents, available, calories, protein };
+}
+
+export async function saveMenuWeekAction(formData: FormData) {
+  const business = await deskBusiness();
+  const weekOf = field(formData, "weekOf");
+  if (weekOf.length > 80) {
+    bounce("/terminal/menu", "Keep the week line under 80 characters.");
+  }
+  setMenuWeekNote(business.id, weekOf);
+  await saved(
+    "/terminal/menu",
+    weekOf ? "Week line saved on the public menu." : "Week line cleared on the public menu.",
+  );
 }
 
 export async function createMenuItemAction(formData: FormData) {

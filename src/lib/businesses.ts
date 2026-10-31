@@ -181,6 +181,31 @@ export function getHomepageBusiness(): BusinessRecord {
   return mapBusiness(any);
 }
 
+function ensureMenuWeekColumn() {
+  const db = getDb();
+  const names = new Set(
+    (db.prepare("PRAGMA table_info(businesses)").all() as { name: string }[]).map((column) => column.name),
+  );
+  if (!names.has("menu_week_note")) {
+    db.exec("ALTER TABLE businesses ADD COLUMN menu_week_note TEXT NOT NULL DEFAULT ''");
+  }
+}
+
+export function getMenuWeekNote(businessId: number) {
+  ensureMenuWeekColumn();
+  const row = getDb()
+    .prepare("SELECT menu_week_note AS note FROM businesses WHERE id = ?")
+    .get(businessId) as { note: string } | undefined;
+  return row?.note ?? "";
+}
+
+export function setMenuWeekNote(businessId: number, note: string) {
+  ensureMenuWeekColumn();
+  getDb()
+    .prepare("UPDATE businesses SET menu_week_note = ?, updated_at = ? WHERE id = ?")
+    .run(note, new Date().toISOString(), businessId);
+}
+
 export function updateBusinessProfile(id: number, name: string, about: string) {
   getDb()
     .prepare("UPDATE businesses SET name = ?, about = ?, updated_at = ? WHERE id = ?")

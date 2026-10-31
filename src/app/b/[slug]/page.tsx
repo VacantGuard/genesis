@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { PublicSite } from "@/components/public-site";
 import { currentCustomer } from "@/lib/customer-auth";
-import { getBusinessBySlug } from "@/lib/businesses";
+import { getBusinessBySlug, getMenuWeekNote } from "@/lib/businesses";
 import { getPublicMenu } from "@/lib/menu";
 import { stripePublishableKey } from "@/lib/stripe";
 
@@ -26,7 +26,7 @@ export default async function BusinessMenuPage({ params }: { params: Promise<{ s
   const account = await currentCustomer();
   return (
     <PublicSite
-      profile={{ name: business.name, about: business.about }}
+      profile={{ name: business.name, about: business.about, weekNote: getMenuWeekNote(business.id) }}
       menu={menu}
       businessSlug={business.slug}
       accountName={account && account.businessId === business.id ? account.name : null}

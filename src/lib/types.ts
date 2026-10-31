@@ -1,6 +1,7 @@
 export type BusinessProfile = {
   name: string;
   about: string;
+  weekNote?: string;
 };
 
 export type MenuCategory = {
@@ -18,6 +19,8 @@ export type MenuItem = {
   priceCents: number;
   available: boolean;
   sortOrder: number;
+  calories: number | null;
+  protein: number | null;
 };
 
 export type PublicMenuItem = {

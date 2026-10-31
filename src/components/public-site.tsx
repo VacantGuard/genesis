@@ -44,6 +44,13 @@ function nutritionLine(item: PublicMenuItem) {
   return parts.join(" | ");
 }
 
+function weekSubtitle(note: string | undefined) {
+  const trimmed = note?.trim() ?? "";
+  if (!trimmed) return null;
+  if (trimmed.startsWith("(") && trimmed.endsWith(")")) return trimmed;
+  return `(${trimmed})`;
+}
+
 type StripeInstance = {
   elements: () => { create: (type: "card") => StripeCard };
   createPaymentMethod: (args: {
@@ -89,6 +96,7 @@ export function PublicSite({
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const weekLine = weekSubtitle(profile.weekNote);
 
   const lookup = useMemo(() => {
     const map = new Map<number, PublicCategory["items"][number]>();
@@ -291,6 +299,9 @@ export function PublicSite({
         <section id="menu" className="scroll-mt-24">
           <div className="mx-auto max-w-3xl px-6 pt-14 pb-6 text-center">
             <h1 className="font-serif text-5xl tracking-tight text-[#496252] sm:text-6xl">menu of the week</h1>
+            {weekLine ? (
+              <p className="mt-2 font-serif text-2xl tracking-tight text-[#496252] sm:text-3xl">{weekLine}</p>
+            ) : null}
             <CoralUnderline />
             <p className="mx-auto mt-5 max-w-md text-sm leading-6 text-[#5d7568]">
               Portioned meals for the week. Order here for delivery.

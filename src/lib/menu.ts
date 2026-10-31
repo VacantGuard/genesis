@@ -1,6 +1,21 @@
 import { getDb } from "./db.ts";
 import type { MenuCategory, MenuItem, PublicCategory } from "./types.ts";
 
+function ensureNutritionColumns() {
+  const db = getDb();
+  const names = new Set(
+    (db.prepare("PRAGMA table_info(menu_items)").all() as { name: string }[]).map((column) => column.name),
+  );
+  if (!names.has("calories")) db.exec("ALTER TABLE menu_items ADD COLUMN calories INTEGER");
+  if (!names.has("protein")) db.exec("ALTER TABLE menu_items ADD COLUMN protein INTEGER");
+}
+
+function asCount(value: number | string | null | undefined) {
+  if (value == null || value === "") return null;
+  const count = Number(value);
+  return Number.isFinite(count) ? count : null;
+}
+
 export function listCategories(businessId: number): MenuCategory[] {
   return getDb()
     .prepare(
@@ -13,6 +28,7 @@ export function listCategories(businessId: number): MenuCategory[] {
 }
 
 export function listMenuItems(businessId: number): MenuItem[] {
+  ensureNutritionColumns();
   return getDb()
     .prepare(
       `SELECT
@@ -23,7 +39,9 @@ export function listMenuItems(businessId: number): MenuItem[] {
          i.description,
          i.price_cents AS priceCents,
          i.available AS available,
-         i.sort_order AS sortOrder
+         i.sort_order AS sortOrder,
+         i.calories AS calories,
+         i.protein AS protein
        FROM menu_items i
        JOIN menu_categories c ON c.id = i.category_id
        WHERE c.business_id = ?
@@ -31,42 +49,23 @@ export function listMenuItems(businessId: number): MenuItem[] {
     )
     .all(businessId)
     .map((row) => {
-      const item = row as Omit<MenuItem, "available"> & { available: number };
-      return { ...item, available: item.available === 1 };
+      const item = row as Omit<MenuItem, "available" | "calories" | "protein"> & {
+        available: number;
+        calories: number | string | null;
+        protein: number | string | null;
+      };
+      return {
+        ...item,
+        available: item.available === 1,
+        calories: asCount(item.calories),
+        protein: asCount(item.protein),
+      };
     });
-}
-
-function nutritionColumn(columns: Set<string>, names: string[]) {
-  return names.find((name) => columns.has(name)) ?? null;
-}
-
-function nutritionByItemId(ids: number[]) {
-  const found = new Map<number, { calories: number | string | null; protein: number | string | null }>();
-  if (ids.length === 0) return found;
-  const db = getDb();
-  const columns = new Set(
-    (db.prepare("PRAGMA table_info(menu_items)").all() as { name: string }[]).map((column) => column.name),
-  );
-  const calorieColumn = nutritionColumn(columns, ["calories"]);
-  const proteinColumn = nutritionColumn(columns, ["protein_grams", "protein"]);
-  if (!calorieColumn && !proteinColumn) return found;
-  const rows = db
-    .prepare(
-      `SELECT id,
-              ${calorieColumn ? `${calorieColumn} AS calories` : "NULL AS calories"},
-              ${proteinColumn ? `${proteinColumn} AS protein` : "NULL AS protein"}
-       FROM menu_items
-       WHERE id IN (${ids.map(() => "?").join(",")})`,
-    )
-    .all(...ids) as { id: number; calories: number | string | null; protein: number | string | null }[];
-  for (const row of rows) found.set(row.id, { calories: row.calories, protein: row.protein });
-  return found;
 }
 
 export function getPublicMenu(businessId: number): PublicCategory[] {
   const categories = listCategories(businessId);
   const items = listMenuItems(businessId);
-  const nutrition = nutritionByItemId(items.map((item) => item.id));
   return categories.map((category) => ({
     id: category.id,
     name: category.name,
@@ -78,8 +77,8 @@ export function getPublicMenu(businessId: number): PublicCategory[] {
         description: item.description,
         priceCents: item.priceCents,
         available: item.available,
-        calories: nutrition.get(item.id)?.calories ?? null,
-        protein: nutrition.get(item.id)?.protein ?? null,
+        calories: item.calories,
+        protein: item.protein,
       })),
   }));
 }
@@ -113,8 +112,11 @@ export function createMenuItem(input: {
   description: string;
   priceCents: number;
   available: boolean;
+  calories?: number | null;
+  protein?: number | null;
 }) {
   const db = getDb();
+  ensureNutritionColumns();
   const category = db
     .prepare("SELECT id FROM menu_categories WHERE id = ? AND business_id = ?")
     .get(input.categoryId, input.businessId);
@@ -123,8 +125,8 @@ export function createMenuItem(input: {
     .prepare("SELECT COALESCE(MAX(sort_order), 0) AS n FROM menu_items WHERE category_id = ?")
     .get(input.categoryId) as { n: number };
   db.prepare(
-    `INSERT INTO menu_items (category_id, name, description, price_cents, available, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO menu_items (category_id, name, description, price_cents, available, sort_order, calories, protein)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     input.categoryId,
     input.name,
@@ -132,6 +134,8 @@ export function createMenuItem(input: {
     input.priceCents,
     input.available ? 1 : 0,
     row.n + 1,
+    input.calories ?? null,
+    input.protein ?? null,
   );
   return true;
 }
@@ -144,28 +148,45 @@ export function updateMenuItem(input: {
   description: string;
   priceCents: number;
   available: boolean;
+  calories?: number | null;
+  protein?: number | null;
 }) {
   const db = getDb();
+  ensureNutritionColumns();
   const category = db
     .prepare("SELECT id FROM menu_categories WHERE id = ? AND business_id = ?")
     .get(input.categoryId, input.businessId);
   if (!category) return false;
+  const assignments = [
+    "category_id = ?",
+    "name = ?",
+    "description = ?",
+    "price_cents = ?",
+    "available = ?",
+  ];
+  const values: Array<string | number | null> = [
+    input.categoryId,
+    input.name,
+    input.description,
+    input.priceCents,
+    input.available ? 1 : 0,
+  ];
+  if (input.calories !== undefined) {
+    assignments.push("calories = ?");
+    values.push(input.calories);
+  }
+  if (input.protein !== undefined) {
+    assignments.push("protein = ?");
+    values.push(input.protein);
+  }
   const result = db
     .prepare(
       `UPDATE menu_items
-       SET category_id = ?, name = ?, description = ?, price_cents = ?, available = ?
+       SET ${assignments.join(", ")}
        WHERE id = ?
          AND category_id IN (SELECT id FROM menu_categories WHERE business_id = ?)`,
     )
-    .run(
-      input.categoryId,
-      input.name,
-      input.description,
-      input.priceCents,
-      input.available ? 1 : 0,
-      input.id,
-      input.businessId,
-    );
+    .run(...values, input.id, input.businessId);
   if (result.changes > 0) return true;
   const row = db
     .prepare(
