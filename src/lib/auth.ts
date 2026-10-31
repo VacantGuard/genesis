@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { staffPasswordMatches } from "./staff-access";
 
 export const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 export const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "kitchen-local";
@@ -21,7 +22,8 @@ function sameSecret(left: string, right: string) {
 }
 
 export function credentialsMatch(username: string, password: string) {
-  return sameSecret(username, ADMIN_USERNAME) && sameSecret(password, ADMIN_PASSWORD);
+  if (sameSecret(username, ADMIN_USERNAME) && sameSecret(password, ADMIN_PASSWORD)) return true;
+  return staffPasswordMatches(username, password);
 }
 
 export function signSession(username: string) {

@@ -12,6 +12,7 @@ const links = [
   { href: "/terminal/campaigns", label: "Texts" },
   { href: "/terminal/orders", label: "Orders" },
   { href: "/terminal/profile", label: "Business" },
+  { href: "/terminal/access", label: "Access" },
   { href: "/terminal/agent", label: "Agent" },
   { href: "/terminal/slack", label: "Slack" },
 ];
