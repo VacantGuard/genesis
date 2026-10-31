@@ -126,7 +126,7 @@ export function scheduleReport(schedule: MenuTextSchedule) {
   return {
     status: "on" as const,
     reason,
-    summary: `The menu text is on for every ${when}. Reason: ${reason} It goes to saved clients and includes the menu link.`,
+    summary: `The menu text is on for every ${when}. Reason: ${reason} After that time it sends once to saved clients and includes the menu link.`,
   };
 }
 
@@ -164,7 +164,9 @@ export function scheduleIsDue(schedule: MenuTextSchedule, now: Date) {
   if (local.weekday !== schedule.weekday || local.date === schedule.lastSentOn) return false;
   const nowMinutes = local.hour * 60 + local.minute;
   const target = schedule.hour * 60 + schedule.minute;
-  return nowMinutes >= target && nowMinutes < target + 15;
+  // Due from the saved minute through the rest of that local day. A later check
+  // still sends once if an earlier check was asleep.
+  return nowMinutes >= target;
 }
 
 export async function sendDueMenuTexts(now = new Date()) {
@@ -178,17 +180,25 @@ export async function sendDueMenuTexts(now = new Date()) {
     const schedule = getMenuTextSchedule(business.id);
     if (!scheduleIsDue(schedule, now)) continue;
     const local = localStamp(now, schedule.timezone);
-    getDb().prepare("UPDATE businesses SET menu_text_last_sent = ? WHERE id = ?").run(local.date, business.id);
-    const origin = rememberedOrigin(business.id) || undefined;
-    const result = await sendCampaign({
-      businessId: business.id,
-      message: schedule.message,
-      linkUrl: menuLink(business.slug, origin),
-      includeCustomers: true,
-      includeCompanyContacts: false,
-      statusCallbackUrl: textStatusCallbackUrl(origin),
-    });
-    sent.push({ businessId: business.id, recipientCount: result.recipientCount });
+    const claim = getDb()
+      .prepare("UPDATE businesses SET menu_text_last_sent = ? WHERE id = ? AND menu_text_last_sent != ?")
+      .run(local.date, business.id, local.date);
+    if (claim.changes !== 1) continue;
+    try {
+      const origin = rememberedOrigin(business.id) || undefined;
+      const result = await sendCampaign({
+        businessId: business.id,
+        message: schedule.message,
+        linkUrl: menuLink(business.slug, origin),
+        includeCustomers: true,
+        includeCompanyContacts: false,
+        statusCallbackUrl: textStatusCallbackUrl(origin),
+      });
+      sent.push({ businessId: business.id, recipientCount: result.recipientCount });
+    } catch (error) {
+      getDb().prepare("UPDATE businesses SET menu_text_last_sent = ? WHERE id = ?").run(schedule.lastSentOn, business.id);
+      console.error("Weekly menu text failed", error);
+    }
   }
   return sent;
 }
