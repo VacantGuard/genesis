@@ -31,25 +31,16 @@ type Confirmation = {
 type StripePaymentElement = {
   mount: (el: HTMLElement) => void;
   destroy: () => void;
-  on: (event: "ready", handler: () => void) => void;
+  on: (
+    event: string,
+    handler: (event?: { paymentFailed?: (options: { reason: "fail" }) => void }) => void,
+  ) => void;
 };
 
 type StripeElements = {
   create: (
-    type: "payment",
-    options: {
-      layout: { type: "accordion"; defaultCollapsed: false; radios: "always" };
-      wallets: { applePay: "auto"; googlePay: "auto" };
-      business: { name: string };
-      fields: {
-        billingDetails: {
-          name: "never";
-          email: "never";
-          phone: "never";
-          address: "never";
-        };
-      };
-    },
+    type: "payment" | "expressCheckout",
+    options?: object,
   ) => StripePaymentElement;
   fetchUpdates: () => Promise<{ error?: { message?: string } }>;
   submit: () => Promise<{ error?: { message?: string } }>;
@@ -145,6 +136,8 @@ export function PublicSite({
   const stripeRef = useRef<StripeInstance | null>(null);
   const elementsRef = useRef<StripeElements | null>(null);
   const paymentRef = useRef<StripePaymentElement | null>(null);
+  const walletRef = useRef<StripePaymentElement | null>(null);
+  const completeStripeRef = useRef<() => Promise<boolean>>(async () => false);
   const intentRef = useRef("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -203,6 +196,8 @@ export function PublicSite({
     }
     return () => {
       cancelled = true;
+      walletRef.current?.destroy();
+      walletRef.current = null;
       paymentRef.current?.destroy();
       paymentRef.current = null;
       elementsRef.current = null;
@@ -219,6 +214,8 @@ export function PublicSite({
 
   useEffect(() => {
     if (!stripePublishableKey || !stripeReady || method !== "card") {
+      walletRef.current?.destroy();
+      walletRef.current = null;
       paymentRef.current?.destroy();
       paymentRef.current = null;
       elementsRef.current = null;
@@ -227,6 +224,8 @@ export function PublicSite({
       return;
     }
     if (!cartKey || total < 50) {
+      walletRef.current?.destroy();
+      walletRef.current = null;
       paymentRef.current?.destroy();
       paymentRef.current = null;
       elementsRef.current = null;
@@ -257,12 +256,14 @@ export function PublicSite({
         }
         const stripe = stripeRef.current;
         const mount = document.getElementById("stripe-payment");
+        const walletMount = document.getElementById("stripe-wallets");
         if (!stripe || !mount) return;
         if (elementsRef.current && intentRef.current === data.paymentIntentId) {
           const refreshed = await elementsRef.current.fetchUpdates();
           if (!cancelled && refreshed.error) setError(refreshed.error.message || "Payment options could not load.");
           return;
         }
+        walletRef.current?.destroy();
         paymentRef.current?.destroy();
         const elements = stripe.elements({
           clientSecret: data.clientSecret,
@@ -284,6 +285,29 @@ export function PublicSite({
         elementsRef.current = elements;
         paymentRef.current = payment;
         intentRef.current = data.paymentIntentId;
+        if (walletMount) {
+          try {
+            const wallet = elements.create("expressCheckout", {
+              buttonHeight: 48,
+              paymentMethods: {
+                applePay: "always",
+                googlePay: "auto",
+                link: "never",
+                paypal: "never",
+                amazonPay: "never",
+              },
+            });
+            wallet.on("confirm", (event) => {
+              void completeStripeRef.current().then((ok) => {
+                if (!ok) event?.paymentFailed?.({ reason: "fail" });
+              });
+            });
+            wallet.mount(walletMount);
+            walletRef.current = wallet;
+          } catch (error) {
+            console.error(error);
+          }
+        }
       })();
     }, 250);
     return () => {
@@ -389,18 +413,23 @@ export function PublicSite({
       setError("Stripe is not connected, so the payment was not completed.");
       return;
     }
+    await payWithCard();
+  }
+
+  async function payWithCard() {
+    setError("");
     const stripe = stripeRef.current;
     const elements = elementsRef.current;
     if (!stripe || !elements || !intentRef.current) {
       setError("Payment options are still loading.");
-      return;
+      return false;
     }
     setPending(true);
     try {
       const submitted = await elements.submit();
       if (submitted.error) {
         setError(submitted.error.message || "The payment was not completed.");
-        return;
+        return false;
       }
       const prepared = await fetch("/api/checkout", {
         method: "POST",
@@ -410,11 +439,10 @@ export function PublicSite({
       const preparedData = (await prepared.json()) as { error?: string; paymentIntentId?: string };
       if (!prepared.ok || !preparedData.paymentIntentId) {
         setError(preparedData.error || "The payment was not completed.");
-        return;
+        return false;
       }
       intentRef.current = preparedData.paymentIntentId;
-      const payload = orderPayload({});
-      sessionStorage.setItem("tigeats-order", JSON.stringify(payload));
+      sessionStorage.setItem("tigeats-order", JSON.stringify(orderPayload({})));
       const confirmed = await stripe.confirmPayment({
         elements,
         redirect: "if_required",
@@ -440,21 +468,39 @@ export function PublicSite({
       });
       if (confirmed.error || confirmed.paymentIntent?.status !== "succeeded") {
         setError(confirmed.error?.message || "The payment was not completed.");
-        return;
+        return false;
       }
       const done = await postOrder({ paymentIntentId: confirmed.paymentIntent.id });
       if (!done.response.ok) {
         setError(done.data.error || "The payment went through, but the order was not recorded. Contact the kitchen with this payment.");
-        return;
+        return false;
       }
       sessionStorage.removeItem("tigeats-order");
       showConfirmation(done.data);
+      return true;
     } catch {
       setError("The payment was not completed. Try again.");
+      return false;
     } finally {
       setPending(false);
     }
   }
+
+  completeStripeRef.current = async () => {
+    const missing =
+      customerName.trim().length < 2 ||
+      phone.replace(/\D/g, "").length < 7 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      deliveryLine1.trim().length < 2 ||
+      deliveryCity.trim().length < 2 ||
+      deliveryState.trim().length < 2 ||
+      deliveryPostalCode.trim().length < 5;
+    if (missing) {
+      setError("Enter your name, phone, email, and delivery address before Apple Pay.");
+      return false;
+    }
+    return payWithCard();
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -697,13 +743,11 @@ export function PublicSite({
             <div>
               <h2 className="font-serif text-4xl tracking-tight text-[#496252]">Order</h2>
               <p className="mt-3 max-w-md text-sm leading-6 text-[#5d7568]">
-                {canCard && canZelle
-                  ? "Pay with Apple Pay, a card, or Zelle. Apple Pay shows when this browser can use it. A Zelle order is paid after the kitchen confirms the transfer."
-                  : canCard
-                    ? "Pay with Apple Pay or a card. Stripe charges it, then the order is marked paid. Apple Pay shows when this browser can use it."
-                    : canZelle
-                      ? "Pay with Zelle. The kitchen confirms the transfer before the order is paid."
-                      : "Checkout is waiting on Stripe. Add the publishable key, secret key, and webhook secret under Business in the staff terminal. A payment is not taken until then."}
+                {canCard
+                  ? "Choose Apple Pay, a card, or Zelle. Apple Pay shows as its own button when this browser can use it. A Zelle order is paid after the kitchen confirms the transfer."
+                  : canZelle
+                    ? "Pay with Zelle. The kitchen confirms the transfer before the order is paid."
+                    : "Checkout is waiting on Stripe. Add the publishable key, secret key, and webhook secret under Business in the staff terminal. A payment is not taken until then."}
               </p>
               <div className="mt-6 grid gap-3">
                 {lines.length === 0 ? (
@@ -910,7 +954,7 @@ export function PublicSite({
                 {canCard || canZelle ? (
                   <fieldset className="mt-2 grid gap-3 border-t pt-4 text-sm">
                     <legend className="font-medium">Payment</legend>
-                    {canCard && canZelle ? (
+                    {canCard ? (
                       <div className="flex flex-wrap gap-4">
                         <label className="flex items-center gap-2">
                           <input
@@ -932,20 +976,28 @@ export function PublicSite({
                         </label>
                       </div>
                     ) : null}
-                    {method === "zelle" && zelle ? (
-                      <p className="leading-6 text-[#5d7568]">
-                        Send {formatMoney(total)} with Zelle to {zelle.name} at {zelle.handle}. Put your name in the
-                        Zelle note. Place the order here, then send the transfer. The kitchen marks it paid when the
-                        money arrives.
-                      </p>
+                    {method === "zelle" ? (
+                      zelle ? (
+                        <p className="leading-6 text-[#5d7568]">
+                          Send {formatMoney(total)} with Zelle to {zelle.name} at {zelle.handle}. Put your name in the
+                          Zelle note. Place the order here, then send the transfer. The kitchen marks it paid when the
+                          money arrives.
+                        </p>
+                      ) : (
+                        <p className="leading-6 text-[#5d7568]">
+                          Zelle is selected. Add the Zelle email or mobile number under Business in the staff desk, then
+                          save it. Customers will see where to send the payment.
+                        </p>
+                      )
                     ) : (
                       <>
+                        <div id="stripe-wallets" className="min-h-12" />
                         <div id="stripe-payment" className="min-h-12" />
                         {lines.length > 0 && !paymentReady ? (
                           <span className="text-xs text-[#5d7568]">Loading Apple Pay and card…</span>
                         ) : (
                           <span className="text-xs text-[#5d7568]">
-                            Apple Pay appears here on a browser that can use it. A card works too.
+                            The Apple Pay button shows above the card when this browser can use it. A card works too.
                           </span>
                         )}
                       </>
@@ -986,7 +1038,7 @@ export function PublicSite({
                 {canCard || canZelle ? (
                   <Button
                     type="submit"
-                    disabled={pending || lines.length === 0 || (method === "card" && !paymentReady)}
+                    disabled={pending || lines.length === 0 || (method === "card" && !paymentReady) || (method === "zelle" && !zelle)}
                     className={`mt-2 ${publicButton}`}
                   >
                     {pending
