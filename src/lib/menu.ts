@@ -36,9 +36,37 @@ export function listMenuItems(businessId: number): MenuItem[] {
     });
 }
 
+function nutritionColumn(columns: Set<string>, names: string[]) {
+  return names.find((name) => columns.has(name)) ?? null;
+}
+
+function nutritionByItemId(ids: number[]) {
+  const found = new Map<number, { calories: number | string | null; protein: number | string | null }>();
+  if (ids.length === 0) return found;
+  const db = getDb();
+  const columns = new Set(
+    (db.prepare("PRAGMA table_info(menu_items)").all() as { name: string }[]).map((column) => column.name),
+  );
+  const calorieColumn = nutritionColumn(columns, ["calories"]);
+  const proteinColumn = nutritionColumn(columns, ["protein_grams", "protein"]);
+  if (!calorieColumn && !proteinColumn) return found;
+  const rows = db
+    .prepare(
+      `SELECT id,
+              ${calorieColumn ? `${calorieColumn} AS calories` : "NULL AS calories"},
+              ${proteinColumn ? `${proteinColumn} AS protein` : "NULL AS protein"}
+       FROM menu_items
+       WHERE id IN (${ids.map(() => "?").join(",")})`,
+    )
+    .all(...ids) as { id: number; calories: number | string | null; protein: number | string | null }[];
+  for (const row of rows) found.set(row.id, { calories: row.calories, protein: row.protein });
+  return found;
+}
+
 export function getPublicMenu(businessId: number): PublicCategory[] {
   const categories = listCategories(businessId);
   const items = listMenuItems(businessId);
+  const nutrition = nutritionByItemId(items.map((item) => item.id));
   return categories.map((category) => ({
     id: category.id,
     name: category.name,
@@ -50,6 +78,8 @@ export function getPublicMenu(businessId: number): PublicCategory[] {
         description: item.description,
         priceCents: item.priceCents,
         available: item.available,
+        calories: nutrition.get(item.id)?.calories ?? null,
+        protein: nutrition.get(item.id)?.protein ?? null,
       })),
   }));
 }

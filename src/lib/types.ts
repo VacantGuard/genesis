@@ -20,16 +20,20 @@ export type MenuItem = {
   sortOrder: number;
 };
 
+export type PublicMenuItem = {
+  id: number;
+  name: string;
+  description: string;
+  priceCents: number;
+  available: boolean;
+  calories?: number | string | null;
+  protein?: number | string | null;
+};
+
 export type PublicCategory = {
   id: number;
   name: string;
-  items: {
-    id: number;
-    name: string;
-    description: string;
-    priceCents: number;
-    available: boolean;
-  }[];
+  items: PublicMenuItem[];
 };
 
 export type Company = {

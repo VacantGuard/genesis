@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PasswordResetForm } from "@/components/password-reset-form";
+import { PublicFooter, PublicHeader, PublicPage } from "@/components/public-chrome";
 import { currentCustomer } from "@/lib/customer-auth";
 import { resetTokenValid } from "@/lib/customer-reset";
-import { getHomepageBusiness } from "@/lib/businesses";
 
 export const metadata = { title: "Reset password" };
 
@@ -14,17 +14,17 @@ export default async function PasswordResetPage({
 }) {
   const { token } = await searchParams;
   if (!token && (await currentCustomer())) redirect("/account");
-  const business = getHomepageBusiness();
   const linkOk = token ? resetTokenValid(token) : false;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center bg-white px-6 py-16 text-[#171a20]">
-      <p className="text-sm text-[#5c5e62]">{business.name}</p>
-      <h1 className="mt-2 text-4xl font-medium tracking-tight">Reset password</h1>
+    <PublicPage>
+      <PublicHeader />
+      <main className="mx-auto flex max-w-md flex-col px-6 py-14">
+      <h1 className="font-serif text-4xl tracking-tight sm:text-5xl">Reset password</h1>
       {token ? (
         linkOk ? (
           <>
-            <p className="mt-3 text-sm text-[#5c5e62]">Choose a new password. This link works once.</p>
+            <p className="mt-3 text-sm text-[#5d7568]">Choose a new password. This link works once.</p>
             <PasswordResetForm token={token} />
           </>
         ) : (
@@ -34,7 +34,7 @@ export default async function PasswordResetPage({
         )
       ) : (
         <>
-          <p className="mt-3 text-sm text-[#5c5e62]">
+          <p className="mt-3 text-sm leading-6 text-[#5d7568]">
             Enter the phone number on your account. We email a reset link to the address on that account.
           </p>
           <PasswordResetForm />
@@ -48,6 +48,8 @@ export default async function PasswordResetPage({
       <Link href="/account/login" className="mt-6 text-sm underline">
         Back to sign in
       </Link>
-    </main>
+      </main>
+      <PublicFooter />
+    </PublicPage>
   );
 }

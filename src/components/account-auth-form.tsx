@@ -2,11 +2,11 @@
 
 import { useActionState } from "react";
 import { signInAction, signUpAction, type AccountFormState } from "@/lib/customer-actions";
+import { publicButton, publicField } from "@/components/public-chrome";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const initial: AccountFormState = { error: "" };
-const field = "h-10 rounded border-0 bg-[#f4f4f4] shadow-none";
 
 export function AccountAuthForm({ mode }: { mode: "signup" | "login" }) {
   const [state, action, pending] = useActionState(mode === "signup" ? signUpAction : signInAction, initial);
@@ -17,17 +17,17 @@ export function AccountAuthForm({ mode }: { mode: "signup" | "login" }) {
         <>
           <label className="grid gap-1.5 text-sm">
             <span className="font-medium">Name</span>
-            <Input name="name" autoComplete="name" required className={field} />
+            <Input name="name" autoComplete="name" required className={publicField} />
           </label>
           <label className="grid gap-1.5 text-sm">
             <span className="font-medium">Phone</span>
-            <Input name="phone" autoComplete="tel" required className={field} />
+            <Input name="phone" autoComplete="tel" required className={publicField} />
           </label>
         </>
       ) : null}
       <label className="grid gap-1.5 text-sm">
         <span className="font-medium">Email</span>
-        <Input name="email" type="email" autoComplete="email" required className={field} />
+        <Input name="email" type="email" autoComplete="email" required className={publicField} />
       </label>
       <label className="grid gap-1.5 text-sm">
         <span className="font-medium">Password</span>
@@ -37,7 +37,7 @@ export function AccountAuthForm({ mode }: { mode: "signup" | "login" }) {
           autoComplete={mode === "signup" ? "new-password" : "current-password"}
           required
           minLength={mode === "signup" ? 8 : undefined}
-          className={field}
+          className={publicField}
         />
       </label>
       {state.error ? (
@@ -45,7 +45,7 @@ export function AccountAuthForm({ mode }: { mode: "signup" | "login" }) {
           {state.error}
         </p>
       ) : null}
-      <Button type="submit" disabled={pending} className="mt-2 h-10 rounded bg-[#171a20] text-white hover:bg-black">
+      <Button type="submit" disabled={pending} className={`mt-2 ${publicButton}`}>
         {pending ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
       </Button>
     </form>
