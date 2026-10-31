@@ -42,15 +42,14 @@ export function PublicHeader({
   return (
     <header className="sticky top-0 z-30 border-b border-[#a8c09c]/60 bg-[#fdeae3]/95 text-[#496252] backdrop-blur">
       <div className="mx-auto flex h-[4.75rem] max-w-5xl items-center justify-between gap-4 px-5">
-        <Link href="/" className="flex min-w-0 items-center gap-2.5">
-          <span className="inline-flex size-14 shrink-0 overflow-hidden rounded-full">
+        <Link href="/" aria-label="Home" className="inline-flex shrink-0">
+          <span className="inline-flex size-14 overflow-hidden rounded-full">
             <img
               src="/tigeats-logo.jpg"
               alt=""
               className="size-full origin-center scale-[1.14] object-cover"
             />
           </span>
-          <TigEatsMark />
         </Link>
         <nav className="flex items-center gap-4 text-sm font-medium sm:gap-6">
           <a href={section("menu")} className="hidden hover:text-[#fc968a] sm:inline">
