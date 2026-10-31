@@ -79,17 +79,14 @@ export function renderMenuMemory(business: BusinessRecord, origin?: string) {
     }
   }
   lines.push("", "## Menu now");
-  if (menu.every((category) => category.items.length === 0)) {
+  const meals = menu.flatMap((category) => category.items);
+  if (meals.length === 0) {
     lines.push("The weekly menu is empty.");
   }
-  for (const category of menu) {
-    if (category.items.length === 0) continue;
-    lines.push("", `### ${category.name}`);
-    for (const item of category.items) {
-      const state = item.available ? "available" : "unavailable";
-      lines.push(`- ${item.name} — ${formatMoney(item.priceCents)} — ${state}`);
-      if (item.description) lines.push(`  ${item.description}`);
-    }
+  for (const item of meals) {
+    const state = item.available ? "available" : "unavailable";
+    lines.push(`- ${item.name} — ${formatMoney(item.priceCents)} — ${state}`);
+    if (item.description) lines.push(`  ${item.description}`);
   }
   lines.push("", "## Clients");
   const customers = listCustomers(business.id);

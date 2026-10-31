@@ -105,9 +105,16 @@ export function deleteCategory(businessId: number, id: number) {
   getDb().prepare("DELETE FROM menu_categories WHERE id = ? AND business_id = ?").run(id, businessId);
 }
 
+function shelfCategoryId(businessId: number) {
+  const existing = listCategories(businessId)[0];
+  if (existing) return existing.id;
+  createCategory(businessId, "Menu");
+  return listCategories(businessId)[0]?.id ?? null;
+}
+
 export function createMenuItem(input: {
   businessId: number;
-  categoryId: number;
+  categoryId?: number | null;
   name: string;
   description: string;
   priceCents: number;
@@ -117,18 +124,20 @@ export function createMenuItem(input: {
 }) {
   const db = getDb();
   ensureNutritionColumns();
+  const categoryId = input.categoryId ?? shelfCategoryId(input.businessId);
+  if (!categoryId) return false;
   const category = db
     .prepare("SELECT id FROM menu_categories WHERE id = ? AND business_id = ?")
-    .get(input.categoryId, input.businessId);
+    .get(categoryId, input.businessId);
   if (!category) return false;
   const row = db
     .prepare("SELECT COALESCE(MAX(sort_order), 0) AS n FROM menu_items WHERE category_id = ?")
-    .get(input.categoryId) as { n: number };
+    .get(categoryId) as { n: number };
   db.prepare(
     `INSERT INTO menu_items (category_id, name, description, price_cents, available, sort_order, calories, protein)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
-    input.categoryId,
+    categoryId,
     input.name,
     input.description,
     input.priceCents,
@@ -143,7 +152,7 @@ export function createMenuItem(input: {
 export function updateMenuItem(input: {
   businessId: number;
   id: number;
-  categoryId: number;
+  categoryId?: number | null;
   name: string;
   description: string;
   priceCents: number;
@@ -153,24 +162,21 @@ export function updateMenuItem(input: {
 }) {
   const db = getDb();
   ensureNutritionColumns();
-  const category = db
-    .prepare("SELECT id FROM menu_categories WHERE id = ? AND business_id = ?")
-    .get(input.categoryId, input.businessId);
-  if (!category) return false;
-  const assignments = [
-    "category_id = ?",
-    "name = ?",
-    "description = ?",
-    "price_cents = ?",
-    "available = ?",
-  ];
+  const assignments = ["name = ?", "description = ?", "price_cents = ?", "available = ?"];
   const values: Array<string | number | null> = [
-    input.categoryId,
     input.name,
     input.description,
     input.priceCents,
     input.available ? 1 : 0,
   ];
+  if (input.categoryId) {
+    const category = db
+      .prepare("SELECT id FROM menu_categories WHERE id = ? AND business_id = ?")
+      .get(input.categoryId, input.businessId);
+    if (!category) return false;
+    assignments.unshift("category_id = ?");
+    values.unshift(input.categoryId);
+  }
   if (input.calories !== undefined) {
     assignments.push("calories = ?");
     values.push(input.calories);

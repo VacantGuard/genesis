@@ -22,11 +22,8 @@ import { OrderError } from "@/lib/db";
 import { textSettings, textStatusCallbackUrl } from "@/lib/messaging";
 import { parseDollarsToCents } from "@/lib/format";
 import {
-  createCategory,
   createMenuItem,
-  deleteCategory,
   deleteMenuItem,
-  renameCategory,
   setMenuItemAvailability,
   updateMenuItem,
 } from "@/lib/menu";
@@ -106,36 +103,6 @@ export async function saveProfileAction(formData: FormData) {
   await saved("/terminal/profile", "Business profile saved. The public page will show it on the next load.");
 }
 
-export async function createCategoryAction(formData: FormData) {
-  const business = await deskBusiness();
-  const name = field(formData, "name");
-  if (name.length < 2 || name.length > 40) {
-    bounce("/terminal/menu", "Category names need 2 to 40 characters.");
-  }
-  createCategory(business.id, name);
-  await saved("/terminal/menu", `Added the ${name} category.`);
-}
-
-export async function renameCategoryAction(formData: FormData) {
-  const business = await deskBusiness();
-  const id = optionalId(field(formData, "id"));
-  const name = field(formData, "name");
-  if (!id) bounce("/terminal/menu", "That category could not be found.");
-  if (name.length < 2 || name.length > 40) {
-    bounce("/terminal/menu", "Category names need 2 to 40 characters.");
-  }
-  renameCategory(business.id, id, name);
-  await tellAgent(business, `${name} is the new category name.`, "Category renamed.");
-}
-
-export async function deleteCategoryAction(formData: FormData) {
-  const business = await deskBusiness();
-  const id = optionalId(field(formData, "id"));
-  if (!id) bounce("/terminal/menu", "That category could not be found.");
-  deleteCategory(business.id, id);
-  await tellAgent(business, "A menu category and its meals were removed.", "Category and its meals were removed.");
-}
-
 function wholeNumber(formData: FormData, key: string, label: string, max: number) {
   const raw = field(formData, key);
   if (!raw) return null;
@@ -153,7 +120,6 @@ function readItem(formData: FormData) {
   const available = checked(formData, "available");
   const calories = wholeNumber(formData, "calories", "Calories", 9999);
   const protein = wholeNumber(formData, "protein", "Protein", 999);
-  if (!categoryId) bounce("/terminal/menu", "Choose a category.");
   if (name.length < 2 || name.length > 80) {
     bounce("/terminal/menu", "Meal names need 2 to 80 characters.");
   }
@@ -183,7 +149,7 @@ export async function createMenuItemAction(formData: FormData) {
   const business = await deskBusiness();
   const item = readItem(formData);
   const savedItem = createMenuItem({ businessId: business.id, ...item });
-  if (!savedItem) bounce("/terminal/menu", "That category is not on this business.");
+  if (!savedItem) bounce("/terminal/menu", "That meal could not be added.");
   await tellAgent(business, `${item.name} is on the weekly menu.`, `${item.name} is on the weekly menu.`);
 }
 

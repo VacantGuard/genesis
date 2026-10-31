@@ -327,45 +327,36 @@ export function PublicSite({
                 The weekly menu is empty. Meals added in the staff terminal show up here.
               </p>
             ) : (
-              <div className="mt-10 grid gap-12">
-                {menu.map((category) => (
-                  <div key={category.id}>
-                    <h2 className="text-center text-xs tracking-[0.18em] text-[#5d7568] uppercase">
-                      {category.name}
-                    </h2>
-                    <ul className="mt-2">
-                      {category.items.map((item) => {
-                        const nutrition = nutritionLine(item);
-                        return (
-                          <li key={item.id} className="mx-auto max-w-xl py-6 text-center">
-                            <p className="text-lg font-semibold tracking-tight text-[#496252]">{item.name}</p>
-                            {item.description ? (
-                              <p className="mt-1 text-sm leading-6 text-[#496252]">{item.description}</p>
-                            ) : null}
-                            {nutrition ? <p className="mt-1 text-sm text-[#496252]">{nutrition}</p> : null}
-                            <p className="mt-2 text-sm text-[#5d7568]">{formatMoney(item.priceCents)}</p>
-                            <div className="mt-3">
-                              {item.available ? (
-                                <Button
-                                  type="button"
-                                  onClick={() => add(item.id)}
-                                  className="h-9 min-w-28 rounded-full bg-[#fc968a] text-white hover:bg-[#f07d70]"
-                                >
-                                  {cart[item.id] ? `Added ${cart[item.id]}` : "Add"}
-                                </Button>
-                              ) : (
-                                <Badge variant="outline" className="rounded-full border-[#a8c09c] text-[#5d7568]">
-                                  Sold out
-                                </Badge>
-                              )}
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                ))}
-              </div>
+              <ul className="mt-10">
+                {menu.flatMap((category) => category.items).map((item) => {
+                  const nutrition = nutritionLine(item);
+                  return (
+                    <li key={item.id} className="mx-auto max-w-xl py-6 text-center">
+                      <p className="text-lg font-semibold tracking-tight text-[#496252]">{item.name}</p>
+                      {item.description ? (
+                        <p className="mt-1 text-sm leading-6 text-[#496252]">{item.description}</p>
+                      ) : null}
+                      {nutrition ? <p className="mt-1 text-sm text-[#496252]">{nutrition}</p> : null}
+                      <p className="mt-2 text-sm text-[#5d7568]">{formatMoney(item.priceCents)}</p>
+                      <div className="mt-3">
+                        {item.available ? (
+                          <Button
+                            type="button"
+                            onClick={() => add(item.id)}
+                            className="h-9 min-w-28 rounded-full bg-[#fc968a] text-white hover:bg-[#f07d70]"
+                          >
+                            {cart[item.id] ? `Added ${cart[item.id]}` : "Add"}
+                          </Button>
+                        ) : (
+                          <Badge variant="outline" className="rounded-full border-[#a8c09c] text-[#5d7568]">
+                            Sold out
+                          </Badge>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </div>
         </section>

@@ -10,12 +10,12 @@ export function CoralUnderline() {
   return (
     <svg
       viewBox="0 0 320 18"
-      className="mx-auto mt-2 h-4 w-56 text-[#f9a89e]"
+      className="mx-auto mt-2 block h-4 w-56 text-[#f9a89e]"
       fill="none"
       aria-hidden="true"
     >
       <path
-        d="M4 11c16-8 32 8 48 0s32-8 48 0 32 8 48 0 32-8 48 0 32 8 48 0 20-6 28 0"
+        d="M26 11c16-8 32 8 48 0s32-8 48 0 32 8 48 0 32-8 48 0 32 8 48 0 20-6 28 0"
         stroke="currentColor"
         strokeWidth="3"
         strokeLinecap="round"
