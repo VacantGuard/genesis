@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
 import { saveAgentWebhook } from "@/lib/agent";
 import { saveTextSettings } from "@/lib/messaging";
+import { saveSlackRouting, slackRouting } from "@/lib/slack-post";
+import { pointTwilioAtInbound } from "@/lib/twilio-inbound";
 import { setPublicOrigin, setSlackConnection } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
 import { getMenuTextSchedule, parseClock, parseWeekday, saveMenuTextSchedule, scheduleReport } from "@/lib/menu-schedule";
@@ -51,8 +53,13 @@ export async function saveTextPlatformAction(formData: FormData) {
     bounce("/terminal/campaigns", error instanceof Error ? error.message : "Could not save the text platform.");
   }
   revalidatePath("/terminal/campaigns");
+  let inbound = "";
+  if (platform && slackRouting(business.id).ordersChannel) {
+    const pointed = await pointTwilioAtInbound(business.id);
+    if (pointed.detail) inbound = ` ${pointed.detail}`;
+  }
   const message = platform
-    ? "Text platform saved. Campaigns send through that account."
+    ? `Text platform saved. Campaigns send through that account.${inbound}`
     : "Text platform disconnected. Campaigns stay in the log until you connect one again.";
   redirect(`/terminal/campaigns?saved=${encodeURIComponent(message)}`);
 }
@@ -139,12 +146,29 @@ export async function saveSlackAction(formData: FormData) {
   }
   try {
     setSlackConnection(business.id, teamId || null, teamId ? teamName : "");
+    saveSlackRouting(business.id, {
+      botToken: field(formData, "botToken"),
+      ordersChannel: field(formData, "ordersChannel"),
+      textsChannel: field(formData, "textsChannel"),
+    });
   } catch (error) {
     bounce("/terminal/slack", error instanceof Error ? error.message : "Could not save the Slack workspace.");
   }
   revalidatePath("/terminal/slack");
+  const routing = slackRouting(business.id);
+  let inbound = "";
+  if (routing.ordersChannel || routing.textsChannel) {
+    const pointed = await pointTwilioAtInbound(business.id);
+    if (pointed.detail) inbound = ` ${pointed.detail}`;
+  }
+  const orders = routing.ordersChannel ? ` New orders post in #${routing.ordersChannel}.` : "";
+  const texts = routing.textsChannel
+    ? ` Incoming texts post in #${routing.textsChannel}.`
+    : routing.ordersChannel
+      ? " Incoming texts post in that same channel."
+      : "";
   const message = teamId
-    ? `Slack workspace ${teamId} is connected to ${business.name}.`
-    : `Slack is disconnected from ${business.name}.`;
+    ? `Slack workspace ${teamId} is connected to ${business.name}.${orders}${texts}${inbound}`
+    : `Slack is disconnected from ${business.name}.${orders}${texts}${inbound}`;
   redirect(`/terminal/slack?saved=${encodeURIComponent(message)}`);
 }
