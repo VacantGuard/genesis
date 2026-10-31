@@ -42,7 +42,8 @@ export function WeeklyTextForm({ schedule }: { schedule: MenuTextSchedule }) {
         </label>
       </div>
       <p className="text-sm text-muted-foreground">
-        Times use {schedule.timezone}. The menu link is added when the text sends. Saving keeps this
+        Times use {schedule.timezone}. After this time, the live site checks every 15 minutes and
+        sends once to saved customers. The menu link is added when the text sends. Saving keeps this
         weekly text on.
       </p>
       <label className="flex items-start gap-2 text-sm">
