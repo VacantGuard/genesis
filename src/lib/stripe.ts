@@ -149,6 +149,46 @@ function paymentDetails(intent: PaymentIntent) {
   return { last4: card?.last4 || "", wallet: card?.wallet?.type || "" };
 }
 
+const applePayDomainsReady = new Set<string>();
+
+export async function ensureApplePayDomains(businessId: number, hosts: string[]) {
+  const secretKey = stripeSecret(businessId);
+  if (!secretKey) return;
+  const names = new Set<string>();
+  for (const host of hosts) {
+    const domain = host.split(",")[0]?.trim().toLowerCase().split(":")[0] ?? "";
+    if (!domain || domain === "localhost" || domain.endsWith(".local") || /^\d+\.\d+\.\d+\.\d+$/.test(domain)) continue;
+    names.add(domain);
+    if (domain.startsWith("www.")) names.add(domain.slice(4));
+    else names.add(`www.${domain}`);
+  }
+  for (const domain of names) {
+    const cacheKey = `${businessId}:${domain}`;
+    if (applePayDomainsReady.has(cacheKey)) continue;
+    try {
+      const listed = (await stripeRequest(secretKey, "payment_method_domains?limit=100", "GET")) as {
+        data?: { id?: string; domain_name?: string; apple_pay?: { status?: string } }[];
+      };
+      let record = listed.data?.find((item) => item.domain_name === domain);
+      if (!record?.id) {
+        record = (await stripeRequest(secretKey, "payment_method_domains", "POST", { domain_name: domain })) as {
+          id?: string;
+          apple_pay?: { status?: string };
+        };
+      }
+      if (record?.id && record.apple_pay?.status !== "active") {
+        record = (await stripeRequest(secretKey, `payment_method_domains/${record.id}/validate`, "POST")) as {
+          id?: string;
+          apple_pay?: { status?: string };
+        };
+      }
+      if (record?.apple_pay?.status === "active") applePayDomainsReady.add(cacheKey);
+    } catch (error) {
+      console.error("Apple Pay domain registration failed", domain, error instanceof Error ? error.message : error);
+    }
+  }
+}
+
 function metadataFields(metadata: Record<string, string>) {
   const fields: Record<string, string> = {};
   for (const [key, value] of Object.entries(metadata)) {

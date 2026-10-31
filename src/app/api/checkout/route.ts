@@ -3,7 +3,7 @@ import { getBusinessBySlug, getHomepageBusiness } from "@/lib/businesses";
 import { OrderError } from "@/lib/db";
 import { readDeliveryAddress, validateDeliveryAddress } from "@/lib/delivery";
 import { cleanLineNote, priceOrderLines } from "@/lib/orders";
-import { openCheckout } from "@/lib/stripe";
+import { ensureApplePayDomains, openCheckout } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -109,6 +109,9 @@ export async function POST(request: Request) {
   for (const line of orderLines) {
     if (line.note) metadata[`n${line.menuItemId}`] = line.note;
   }
+
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
+  await ensureApplePayDomains(business.id, [host, "tigeats.com", "www.tigeats.com"]);
 
   const opened = await openCheckout({
     businessId: business.id,
