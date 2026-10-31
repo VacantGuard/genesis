@@ -326,17 +326,6 @@ export function orderExportRows(businessId: number) {
     });
 }
 
-export function clearRecordedOrders() {
-  const db = getDb();
-  const before = db.prepare("SELECT COUNT(*) AS n FROM orders").get() as { n: number };
-  const clear = db.transaction(() => {
-    db.prepare("DELETE FROM order_items").run();
-    db.prepare("DELETE FROM orders").run();
-  });
-  clear();
-  return before.n;
-}
-
 export function getDashboardStats(businessId: number): DashboardStats {
   const db = getDb();
   const orders = db
