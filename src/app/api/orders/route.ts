@@ -26,8 +26,6 @@ type Body = {
   };
   paymentMethodId?: string;
   paymentIntentId?: string;
-  /** Records an order without charging a card. */
-  skipPayment?: boolean;
   lines?: { menuItemId?: number; quantity?: number; note?: string }[];
 };
 
@@ -91,10 +89,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That menu is not available." }, { status: 400 });
   }
 
-  const skipPayment = body.skipPayment === true;
-  let cardLast4 = "TEST";
+  let cardLast4 = "";
   let stripePaymentIntentId = "";
-  if (!skipPayment) {
+  {
     const stripe = stripeSettings(business.id);
     if (!stripe.connected) {
       return NextResponse.json(
@@ -180,7 +177,6 @@ export async function POST(request: Request) {
       deliveryAddress: saved.deliveryAddress,
       deliveryLocateUrl: saved.deliveryLocateUrl,
       items: saved.items,
-      skipPayment,
       last4: cardLast4,
     });
   } catch (error) {

@@ -18,7 +18,6 @@ type Confirmation = {
   deliveryLocateUrl?: string;
   items: { name: string; quantity: number; unitPriceCents: number; note?: string }[];
   last4: string;
-  skipPayment?: boolean;
   requiresAction?: boolean;
   clientSecret?: string;
   paymentIntentId?: string;
@@ -217,31 +216,13 @@ export function PublicSite({
     return { response, data };
   }
 
-  function showConfirmation(data: Confirmation, skipPayment: boolean) {
+  function showConfirmation(data: Confirmation) {
     setConfirmation({
       ...data,
-      last4: data.last4 || (skipPayment ? "TEST" : ""),
-      skipPayment,
+      last4: data.last4 || "",
     });
     setCart({});
     document.getElementById("pos")?.scrollIntoView({ behavior: "smooth" });
-  }
-
-  async function submitOrder(skipPayment: boolean) {
-    setError("");
-    setPending(true);
-    try {
-      const { response, data } = await postOrder({ skipPayment });
-      if (!response.ok) {
-        setError(data.error || "The order was not recorded.");
-        return;
-      }
-      showConfirmation(data, skipPayment);
-    } catch {
-      setError("The kitchen could not be reached. Try again.");
-    } finally {
-      setPending(false);
-    }
   }
 
   async function pay(event: React.FormEvent) {
@@ -283,7 +264,7 @@ export function PublicSite({
         setError(data.error || "The card was not charged.");
         return;
       }
-      showConfirmation(data, false);
+      showConfirmation(data);
     } catch {
       setError("The card was not charged. Try again.");
     } finally {
@@ -438,15 +419,11 @@ export function PublicSite({
                 <p className="text-sm text-[#5d7568]">Paid</p>
                 <h3 className="mt-2 font-serif text-4xl tracking-tight text-[#496252]">{confirmation.orderNumber}</h3>
                 <p className="mt-3 text-sm leading-6 text-[#5d7568]">
-                  {confirmation.customerName}, your meal order is{" "}
-                  {confirmation.skipPayment ? "recorded for testing (no payment)" : "paid"}
+                  {confirmation.customerName}, your meal order is paid
                   {confirmation.deliveryAddress
                     ? ` and queued for delivery to ${confirmation.deliveryAddress}`
                     : ""}
-                  .
-                  {confirmation.skipPayment
-                    ? " No card was used."
-                    : ` Card ending ${confirmation.last4} was charged through Stripe.`}
+                  . Card ending {confirmation.last4} was charged through Stripe.
                   {smsOptIn
                     ? ` You are enrolled in ${profile.name} menu texts. A confirmation text welcomes you to the program. Reply STOP to opt out or HELP for help.`
                     : ""}
@@ -632,20 +609,6 @@ export function PublicSite({
                     {pending ? "Charging card…" : `Pay ${formatMoney(total)}`}
                   </Button>
                 ) : null}
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={pending || lines.length === 0}
-                  className="h-10 rounded-full border-[#a8c09c] text-[#496252]"
-                  onClick={() => void submitOrder(true)}
-                >
-                  {pending ? "Recording order…" : "Place test order (no card)"}
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  {stripePublishableKey
-                    ? "Pay charges the card through Stripe. Place test order records a ticket without charging a card."
-                    : "Place test order records a ticket without charging a card. Pay stays off until Stripe is connected under Business."}
-                </p>
               </form>
             )}
           </div>
