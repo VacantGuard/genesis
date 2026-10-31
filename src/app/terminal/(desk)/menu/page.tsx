@@ -1,5 +1,6 @@
 import { ConfirmButton } from "@/components/confirm-button";
 import { Flash } from "@/components/flash";
+import { MealPhotoField } from "@/components/terminal/meal-photo-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -127,20 +128,9 @@ export default async function MenuPage({
                       <input type="checkbox" name="available" value="1" defaultChecked={item.available} />
                       Available on the public menu
                     </label>
-                    <label className="grid gap-1.5 text-sm md:col-span-2">
-                      <span className="font-medium">Photo</span>
-                      {photo ? (
-                        <img src={photo} alt="" className="h-36 w-full max-w-xs rounded-lg object-cover" />
-                      ) : (
-                        <span className="text-muted-foreground">No photo yet. It shows above this meal on the public menu.</span>
-                      )}
-                      <input
-                        name="photo"
-                        type="file"
-                        accept="image/jpeg,image/png,.jpg,.jpeg,.png"
-                        className="text-sm"
-                      />
-                    </label>
+                    <div className="grid gap-1.5 text-sm md:col-span-2">
+                      <MealPhotoField currentUrl={photo} />
+                    </div>
                     {photo ? (
                       <label className="flex items-center gap-2 text-sm md:col-span-2">
                         <input type="checkbox" name="removePhoto" value="1" />
@@ -207,11 +197,9 @@ export default async function MenuPage({
               placeholder="Short description"
               className="min-h-20 bg-background md:col-span-2"
             />
-            <label className="grid gap-1.5 text-sm md:col-span-2">
-              <span className="font-medium">Photo</span>
-              <input name="photo" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" className="text-sm" />
-              <span className="text-xs text-muted-foreground">Optional jpg or png, up to 4 MB. Shown above the meal.</span>
-            </label>
+            <div className="text-sm md:col-span-2">
+              <MealPhotoField />
+            </div>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input type="hidden" name="available" value="0" />
