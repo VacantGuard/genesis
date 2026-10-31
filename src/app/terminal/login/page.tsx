@@ -13,7 +13,7 @@ export default async function LoginPage() {
       <p className="text-xs font-medium tracking-[0.18em] text-primary uppercase">Staff terminal</p>
       <h1 className="font-heading mt-2 text-4xl tracking-tight">Sign in</h1>
       <p className="mt-3 text-sm text-muted-foreground">
-        One shared login for the kitchen. There is no public signup.
+        Sign in with the kitchen login, or with a username created from a staff invite.
       </p>
       <LoginForm />
       <Link href="/" className="mt-8 text-sm text-muted-foreground hover:text-foreground">

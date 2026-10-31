@@ -154,6 +154,15 @@ export async function sendCampaign(input: {
   };
 }
 
+export function clearCampaignHistory() {
+  ensureCampaignMediaColumns();
+  const db = getDb();
+  const count = db.prepare("SELECT COUNT(*) AS n FROM campaigns").get() as { n: number };
+  db.exec("DELETE FROM sms_log");
+  db.exec("DELETE FROM campaigns");
+  return count.n;
+}
+
 export function listCampaigns(businessId: number): Campaign[] {
   textSettings(businessId);
   ensureCampaignMediaColumns();
