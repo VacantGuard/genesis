@@ -622,6 +622,12 @@ export function PublicSite({
                 })}
               </ul>
             )}
+            <p className="mx-auto mt-10 max-w-xl text-center text-sm leading-6 text-[#5d7568]">
+              <span className="font-semibold text-[#496252]">ALLERGY WARNING:</span> Meals are prepared in a
+              shared kitchen that handles common allergens, including wheat, gluten, dairy, soy, eggs, fish
+              and shellfish. Please disclose all allergies before ordering. Cross-contact may occur.
+              Substitutions must be requested in advance and are subject to availability.
+            </p>
           </div>
         </section>
 
