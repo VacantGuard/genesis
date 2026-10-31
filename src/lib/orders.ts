@@ -188,7 +188,7 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
         `INSERT INTO orders
           (order_number, customer_name, phone, email, company_name, notes, card_last4, total_cents, status, created_at, business_id, sms_opt_in,
            delivery_line1, delivery_line2, delivery_city, delivery_state, delivery_postal_code, stripe_payment_intent_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         orderNumber,
@@ -199,6 +199,7 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
         input.notes,
         input.cardLast4,
         totalCents,
+        input.orderStatus === "zelle" ? "zelle" : "paid",
         createdAt,
         businessId,
         input.smsOptIn ? 1 : 0,
@@ -237,6 +238,16 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
   return run();
 }
 
+export function markZelleReceived(businessId: number, orderId: number) {
+  const result = getDb()
+    .prepare(
+      `UPDATE orders SET status = 'paid'
+       WHERE id = ? AND business_id = ? AND status = 'zelle' AND card_last4 = 'Zelle'`,
+    )
+    .run(orderId, businessId);
+  return result.changes > 0;
+}
+
 export function listOrders(businessId: number): KitchenOrder[] {
   const db = getDb();
   ensureOrderDeliveryColumns(db);
@@ -245,7 +256,7 @@ export function listOrders(businessId: number): KitchenOrder[] {
     .prepare(
       `SELECT id, order_number AS orderNumber, customer_name AS customerName, phone, email,
               company_name AS companyName, notes, card_last4 AS cardLast4,
-              total_cents AS totalCents, created_at AS createdAt,
+              total_cents AS totalCents, status, created_at AS createdAt,
               delivery_line1 AS deliveryLine1, delivery_line2 AS deliveryLine2,
               delivery_city AS deliveryCity, delivery_state AS deliveryState,
               delivery_postal_code AS deliveryPostalCode

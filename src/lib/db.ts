@@ -20,6 +20,7 @@ export type NewOrderInput = {
   notes: string;
   cardLast4: string;
   lines: OrderLineInput[];
+  orderStatus?: "paid" | "zelle";
   smsOptIn?: boolean;
   stripePaymentIntentId?: string;
   delivery?: {

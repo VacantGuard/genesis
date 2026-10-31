@@ -5,6 +5,7 @@ import { getBusinessBySlug, getMenuWeekNote } from "@/lib/businesses";
 import { getPublicMenu } from "@/lib/menu";
 import { listReviews } from "@/lib/reviews";
 import { stripePublishableKey } from "@/lib/stripe";
+import { zelleAccount } from "@/lib/zelle";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -33,6 +34,7 @@ export default async function BusinessMenuPage({ params }: { params: Promise<{ s
       businessSlug={business.slug}
       accountName={account && account.businessId === business.id ? account.name : null}
       stripePublishableKey={stripePublishableKey(business.id)}
+      zelle={zelleAccount(business.id)}
     />
   );
 }

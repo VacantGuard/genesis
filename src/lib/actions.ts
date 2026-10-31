@@ -28,6 +28,7 @@ import {
   setMenuItemAvailability,
   updateMenuItem,
 } from "@/lib/menu";
+import { markZelleReceived } from "@/lib/orders";
 import { findTextPhoto, sniffPhoto, TEXT_PHOTO_MAX_BYTES, textPhotoPublicUrl } from "@/lib/text-media";
 import { sendCampaign } from "@/lib/texts";
 
@@ -195,6 +196,15 @@ export async function updateMenuItemAction(formData: FormData) {
   if (!updated) bounce("/terminal/menu", "That meal is not on this business.");
   storeMealPhoto(business.id, id, photo);
   await tellAgent(business, `${item.name} was updated on the weekly menu.`, `${item.name} was updated on the public menu.`);
+}
+
+export async function markZelleReceivedAction(formData: FormData) {
+  const business = await deskBusiness();
+  const id = optionalId(field(formData, "id"));
+  if (!id || !markZelleReceived(business.id, id)) {
+    bounce("/terminal/orders", "That Zelle order could not be marked received.");
+  }
+  await saved("/terminal/orders", "Zelle transfer marked received.");
 }
 
 export async function setAvailabilityAction(formData: FormData) {

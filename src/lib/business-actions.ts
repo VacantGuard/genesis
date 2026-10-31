@@ -9,6 +9,7 @@ import { setPublicOrigin, setSlackConnection } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
 import { getMenuTextSchedule, parseClock, parseWeekday, saveMenuTextSchedule, scheduleReport } from "@/lib/menu-schedule";
 import { saveStripeSettings } from "@/lib/stripe";
+import { saveZelleAccount } from "@/lib/zelle";
 
 function field(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -75,8 +76,27 @@ export async function saveStripeAction(formData: FormData) {
   revalidatePath(`/b/${business.slug}`);
   const message = disconnect
     ? "Stripe is disconnected. Customer checkout will not charge a card."
-    : "Stripe is connected. Customer checkout charges cards for this business.";
+    : "Stripe is connected. Customer checkout can take Apple Pay and cards for this business.";
   redirect(`/terminal/profile?saved=${encodeURIComponent(message)}`);
+}
+
+export async function saveZelleAction(formData: FormData) {
+  const business = await currentBusiness();
+  await requireSession();
+  try {
+    saveZelleAccount(business.id, { name: field(formData, "name"), handle: field(formData, "handle") });
+  } catch (error) {
+    bounce("/terminal/profile", error instanceof Error ? error.message : "Could not save Zelle.");
+  }
+  revalidatePath("/terminal/profile");
+  revalidatePath("/");
+  revalidatePath(`/b/${business.slug}`);
+  const handle = field(formData, "handle");
+  redirect(
+    `/terminal/profile?saved=${encodeURIComponent(
+      handle ? "Zelle is on the public checkout." : "Zelle was removed from the public checkout.",
+    )}`,
+  );
 }
 
 export async function saveWeeklyMenuTextAction(formData: FormData) {
