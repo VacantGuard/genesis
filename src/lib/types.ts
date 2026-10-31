@@ -21,6 +21,7 @@ export type MenuItem = {
   sortOrder: number;
   calories: number | null;
   protein: number | null;
+  photoUpdatedAt: string | null;
 };
 
 export type PublicMenuItem = {
@@ -31,6 +32,7 @@ export type PublicMenuItem = {
   available: boolean;
   calories?: number | string | null;
   protein?: number | string | null;
+  photoUrl?: string | null;
 };
 
 export type PublicCategory = {

@@ -14,6 +14,7 @@ import {
 import { getMenuWeekNote } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
 import { formatMoney } from "@/lib/format";
+import { mealPhotoUrl } from "@/lib/meal-photo";
 import { listMenuItems } from "@/lib/menu";
 
 export default async function MenuPage({
@@ -55,15 +56,16 @@ export default async function MenuPage({
         </div>
       </form>
 
-      <section className="grid gap-4 rounded-xl border bg-card p-4">
-        {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No meals on the menu yet.</p>
-        ) : (
-          <div className="grid gap-4">
-            {items.map((item) => (
-              <div key={item.id} className="grid gap-3 border-t pt-4 first:border-t-0 first:pt-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-medium">{item.name}</p>
+      {items.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No meals on the menu yet.</p>
+      ) : (
+        <div className="grid gap-6">
+          {items.map((item) => {
+            const photo = mealPhotoUrl(item.id, item.photoUpdatedAt);
+            return (
+              <section key={item.id} className="grid gap-4 rounded-xl border bg-card p-4">
+                <div className="flex flex-wrap items-center gap-2 border-b pb-3">
+                  <h2 className="font-heading text-xl">{item.name}</h2>
                   <span className="text-sm text-muted-foreground">{formatMoney(item.priceCents)}</span>
                   {item.available ? <Badge>Available</Badge> : <Badge variant="outline">Sold out</Badge>}
                 </div>
@@ -125,6 +127,26 @@ export default async function MenuPage({
                       <input type="checkbox" name="available" value="1" defaultChecked={item.available} />
                       Available on the public menu
                     </label>
+                    <label className="grid gap-1.5 text-sm md:col-span-2">
+                      <span className="font-medium">Photo</span>
+                      {photo ? (
+                        <img src={photo} alt="" className="h-36 w-full max-w-xs rounded-lg object-cover" />
+                      ) : (
+                        <span className="text-muted-foreground">No photo yet. It shows above this meal on the public menu.</span>
+                      )}
+                      <input
+                        name="photo"
+                        type="file"
+                        accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+                        className="text-sm"
+                      />
+                    </label>
+                    {photo ? (
+                      <label className="flex items-center gap-2 text-sm md:col-span-2">
+                        <input type="checkbox" name="removePhoto" value="1" />
+                        Remove photo
+                      </label>
+                    ) : null}
                   </div>
                   <div>
                     <Button type="submit">Save meal</Button>
@@ -143,13 +165,14 @@ export default async function MenuPage({
                     <ConfirmButton message={`Remove ${item.name} from the menu?`}>Delete</ConfirmButton>
                   </form>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              </section>
+            );
+          })}
+        </div>
+      )}
 
-        <form action={createMenuItemAction} className="grid gap-3 border-t pt-4">
-          <p className="text-sm font-medium">Add a meal</p>
+      <form action={createMenuItemAction} className="grid gap-3 rounded-xl border bg-card p-4">
+        <h2 className="font-heading text-xl">Add a meal</h2>
           <div className="grid gap-3 md:grid-cols-2">
             <Input name="name" placeholder="Meal name" required className="h-10 bg-background" />
             <Input
@@ -184,6 +207,11 @@ export default async function MenuPage({
               placeholder="Short description"
               className="min-h-20 bg-background md:col-span-2"
             />
+            <label className="grid gap-1.5 text-sm md:col-span-2">
+              <span className="font-medium">Photo</span>
+              <input name="photo" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" className="text-sm" />
+              <span className="text-xs text-muted-foreground">Optional jpg or png, up to 4 MB. Shown above the meal.</span>
+            </label>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input type="hidden" name="available" value="0" />
@@ -196,7 +224,6 @@ export default async function MenuPage({
             </Button>
           </div>
         </form>
-      </section>
     </>
   );
 }

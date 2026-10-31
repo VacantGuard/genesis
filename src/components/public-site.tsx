@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatWhen } from "@/lib/format";
+import type { PublicReview } from "@/lib/reviews";
 import type { BusinessProfile, PublicCategory, PublicMenuItem } from "@/lib/types";
 import { CoralUnderline, PublicFooter, PublicHeader, publicButton, publicField } from "@/components/public-chrome";
 import { Badge } from "@/components/ui/badge";
@@ -66,12 +67,14 @@ type StripeInstance = {
 export function PublicSite({
   profile,
   menu,
+  reviews: initialReviews,
   businessSlug,
   accountName,
   stripePublishableKey,
 }: {
   profile: BusinessProfile;
   menu: PublicCategory[];
+  reviews: PublicReview[];
   businessSlug: string;
   accountName?: string | null;
   stripePublishableKey?: string | null;
@@ -95,6 +98,12 @@ export function PublicSite({
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [reviews, setReviews] = useState(initialReviews);
+  const [reviewAuthor, setReviewAuthor] = useState("");
+  const [reviewBody, setReviewBody] = useState("");
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewError, setReviewError] = useState("");
+  const [reviewPending, setReviewPending] = useState(false);
   const weekLine = weekSubtitle(profile.weekNote);
 
   const lookup = useMemo(() => {
@@ -313,6 +322,13 @@ export function PublicSite({
                   const nutrition = nutritionLine(item);
                   return (
                     <li key={item.id} className="mx-auto max-w-xl py-6 text-center">
+                      {item.photoUrl ? (
+                        <img
+                          src={item.photoUrl}
+                          alt=""
+                          className="mx-auto mb-4 h-52 w-full max-w-sm rounded-2xl object-cover"
+                        />
+                      ) : null}
                       <p className="text-lg font-semibold tracking-tight text-[#496252]">{item.name}</p>
                       {item.description ? (
                         <p className="mt-1 text-sm leading-6 text-[#496252]">{item.description}</p>
@@ -339,6 +355,111 @@ export function PublicSite({
                 })}
               </ul>
             )}
+          </div>
+        </section>
+
+        <section id="reviews" className="scroll-mt-24 border-t border-[#a8c09c]/50">
+          <div className="mx-auto max-w-3xl px-6 py-16 text-center">
+            <h2 className="font-serif text-4xl tracking-tight text-[#496252]">Reviews</h2>
+            <CoralUnderline />
+            {reviews.length === 0 ? (
+              <p className="mt-6 text-sm text-[#5d7568]">No reviews yet. Tell the kitchen how a meal went.</p>
+            ) : (
+              <ul className="mt-6">
+                {reviews.map((review) => (
+                  <li key={review.id} className="mx-auto max-w-xl border-b border-[#a8c09c]/40 py-5 last:border-b-0">
+                    <p className="text-sm tracking-wide text-[#fc968a]" aria-label={`${review.rating} out of 5`}>
+                      {"★".repeat(review.rating)}
+                      {"☆".repeat(5 - review.rating)}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[#496252]">{review.body}</p>
+                    <p className="mt-2 text-xs text-[#5d7568]">
+                      {review.author} · {formatWhen(review.createdAt)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <form
+              className="mx-auto mt-8 grid max-w-xl gap-3 text-left"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                setReviewError("");
+                setReviewPending(true);
+                try {
+                  const response = await fetch("/api/reviews", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({
+                      businessSlug,
+                      author: reviewAuthor,
+                      rating: reviewRating,
+                      body: reviewBody,
+                    }),
+                  });
+                  const data = (await response.json()) as { error?: string; review?: PublicReview };
+                  if (!response.ok || !data.review) {
+                    setReviewError(data.error || "That review could not be saved.");
+                    return;
+                  }
+                  setReviews((current) => [data.review as PublicReview, ...current]);
+                  setReviewAuthor("");
+                  setReviewBody("");
+                  setReviewRating(5);
+                } catch {
+                  setReviewError("That review could not be saved.");
+                } finally {
+                  setReviewPending(false);
+                }
+              }}
+            >
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium text-[#496252]">Name</span>
+                <Input
+                  value={reviewAuthor}
+                  onChange={(event) => setReviewAuthor(event.target.value)}
+                  required
+                  maxLength={40}
+                  className={publicField}
+                />
+              </label>
+              <fieldset className="grid gap-1.5 text-sm">
+                <legend className="font-medium text-[#496252]">Rating</legend>
+                <div className="flex flex-wrap gap-2">
+                  {[5, 4, 3, 2, 1].map((score) => (
+                    <label key={score} className="flex items-center gap-1.5">
+                      <input
+                        type="radio"
+                        name="rating"
+                        value={score}
+                        checked={reviewRating === score}
+                        onChange={() => setReviewRating(score)}
+                      />
+                      {score}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium text-[#496252]">Review</span>
+                <Textarea
+                  value={reviewBody}
+                  onChange={(event) => setReviewBody(event.target.value)}
+                  required
+                  minLength={4}
+                  maxLength={500}
+                  className={`min-h-24 ${publicField}`}
+                />
+              </label>
+              {reviewError ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {reviewError}
+                </p>
+              ) : null}
+              <Button type="submit" disabled={reviewPending} className={publicButton}>
+                {reviewPending ? "Saving…" : "Leave a review"}
+              </Button>
+            </form>
           </div>
         </section>
 

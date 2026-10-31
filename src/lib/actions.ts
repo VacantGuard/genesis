@@ -21,13 +21,14 @@ import {
 import { OrderError } from "@/lib/db";
 import { textSettings, textStatusCallbackUrl } from "@/lib/messaging";
 import { parseDollarsToCents } from "@/lib/format";
+import { saveMealPhoto, clearMealPhoto } from "@/lib/meal-photo";
 import {
   createMenuItem,
   deleteMenuItem,
   setMenuItemAvailability,
   updateMenuItem,
 } from "@/lib/menu";
-import { findTextPhoto, textPhotoPublicUrl } from "@/lib/text-media";
+import { findTextPhoto, sniffPhoto, TEXT_PHOTO_MAX_BYTES, textPhotoPublicUrl } from "@/lib/text-media";
 import { sendCampaign } from "@/lib/texts";
 
 export type LoginState = { error: string };
@@ -145,11 +146,40 @@ export async function saveMenuWeekAction(formData: FormData) {
   );
 }
 
+async function mealPhoto(formData: FormData) {
+  const file = formData.get("photo");
+  const remove = field(formData, "removePhoto") === "1";
+  if (!(file instanceof File) || file.size === 0) return { bytes: null as Buffer | null, remove };
+  if (file.size > TEXT_PHOTO_MAX_BYTES) {
+    bounce("/terminal/menu", "That photo is over 4 MB. Use a smaller jpg or png.");
+  }
+  const bytes = Buffer.from(await file.arrayBuffer());
+  if (!sniffPhoto(bytes)) bounce("/terminal/menu", "Attach a jpg or png.");
+  return { bytes, remove: false };
+}
+
+function storeMealPhoto(businessId: number, menuItemId: number, photo: { bytes: Buffer | null; remove: boolean }) {
+  try {
+    if (photo.bytes) {
+      if (!saveMealPhoto(businessId, menuItemId, photo.bytes)) {
+        bounce("/terminal/menu", "That meal could not be found.");
+      }
+      return;
+    }
+    if (photo.remove) clearMealPhoto(businessId, menuItemId);
+  } catch (error) {
+    if (error instanceof OrderError) bounce("/terminal/menu", error.message);
+    throw error;
+  }
+}
+
 export async function createMenuItemAction(formData: FormData) {
   const business = await deskBusiness();
   const item = readItem(formData);
-  const savedItem = createMenuItem({ businessId: business.id, ...item });
-  if (!savedItem) bounce("/terminal/menu", "That meal could not be added.");
+  const photo = await mealPhoto(formData);
+  const mealId = createMenuItem({ businessId: business.id, ...item });
+  if (!mealId) bounce("/terminal/menu", "That meal could not be added.");
+  storeMealPhoto(business.id, mealId, photo);
   await tellAgent(business, `${item.name} is on the weekly menu.`, `${item.name} is on the weekly menu.`);
 }
 
@@ -158,8 +188,10 @@ export async function updateMenuItemAction(formData: FormData) {
   const id = optionalId(field(formData, "id"));
   if (!id) bounce("/terminal/menu", "That meal could not be found.");
   const item = readItem(formData);
+  const photo = await mealPhoto(formData);
   const updated = updateMenuItem({ businessId: business.id, id, ...item });
   if (!updated) bounce("/terminal/menu", "That meal is not on this business.");
+  storeMealPhoto(business.id, id, photo);
   await tellAgent(business, `${item.name} was updated on the weekly menu.`, `${item.name} was updated on the public menu.`);
 }
 

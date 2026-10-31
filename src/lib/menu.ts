@@ -1,4 +1,5 @@
 import { getDb } from "./db.ts";
+import { clearMealPhoto, ensureMealPhotos, mealPhotoUrl } from "./meal-photo.ts";
 import type { MenuCategory, MenuItem, PublicCategory } from "./types.ts";
 
 function ensureNutritionColumns() {
@@ -29,6 +30,7 @@ export function listCategories(businessId: number): MenuCategory[] {
 
 export function listMenuItems(businessId: number): MenuItem[] {
   ensureNutritionColumns();
+  ensureMealPhotos();
   return getDb()
     .prepare(
       `SELECT
@@ -41,7 +43,8 @@ export function listMenuItems(businessId: number): MenuItem[] {
          i.available AS available,
          i.sort_order AS sortOrder,
          i.calories AS calories,
-         i.protein AS protein
+         i.protein AS protein,
+         (SELECT updated_at FROM meal_photos WHERE menu_item_id = i.id) AS photoUpdatedAt
        FROM menu_items i
        JOIN menu_categories c ON c.id = i.category_id
        WHERE c.business_id = ?
@@ -49,16 +52,18 @@ export function listMenuItems(businessId: number): MenuItem[] {
     )
     .all(businessId)
     .map((row) => {
-      const item = row as Omit<MenuItem, "available" | "calories" | "protein"> & {
+      const item = row as Omit<MenuItem, "available" | "calories" | "protein" | "photoUpdatedAt"> & {
         available: number;
         calories: number | string | null;
         protein: number | string | null;
+        photoUpdatedAt: string | null;
       };
       return {
         ...item,
         available: item.available === 1,
         calories: asCount(item.calories),
         protein: asCount(item.protein),
+        photoUpdatedAt: item.photoUpdatedAt || null,
       };
     });
 }
@@ -79,6 +84,7 @@ export function getPublicMenu(businessId: number): PublicCategory[] {
         available: item.available,
         calories: item.calories,
         protein: item.protein,
+        photoUrl: mealPhotoUrl(item.id, item.photoUpdatedAt),
       })),
   }));
 }
@@ -133,20 +139,22 @@ export function createMenuItem(input: {
   const row = db
     .prepare("SELECT COALESCE(MAX(sort_order), 0) AS n FROM menu_items WHERE category_id = ?")
     .get(categoryId) as { n: number };
-  db.prepare(
-    `INSERT INTO menu_items (category_id, name, description, price_cents, available, sort_order, calories, protein)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    categoryId,
-    input.name,
-    input.description,
-    input.priceCents,
-    input.available ? 1 : 0,
-    row.n + 1,
-    input.calories ?? null,
-    input.protein ?? null,
-  );
-  return true;
+  const inserted = db
+    .prepare(
+      `INSERT INTO menu_items (category_id, name, description, price_cents, available, sort_order, calories, protein)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      categoryId,
+      input.name,
+      input.description,
+      input.priceCents,
+      input.available ? 1 : 0,
+      row.n + 1,
+      input.calories ?? null,
+      input.protein ?? null,
+    );
+  return Number(inserted.lastInsertRowid);
 }
 
 export function updateMenuItem(input: {
@@ -217,14 +225,23 @@ export function setMenuItemAvailability(businessId: number, id: number, availabl
 }
 
 export function deleteMenuItem(businessId: number, id: number) {
-  const result = getDb()
+  const db = getDb();
+  const owned = db
     .prepare(
-      `DELETE FROM menu_items
-       WHERE id = ?
-         AND category_id IN (SELECT id FROM menu_categories WHERE business_id = ?)`,
+      `SELECT i.id
+       FROM menu_items i
+       JOIN menu_categories c ON c.id = i.category_id
+       WHERE i.id = ? AND c.business_id = ?`,
     )
-    .run(id, businessId);
-  return result.changes > 0;
+    .get(id, businessId);
+  if (!owned) return false;
+  clearMealPhoto(businessId, id);
+  db.prepare(
+    `DELETE FROM menu_items
+     WHERE id = ?
+       AND category_id IN (SELECT id FROM menu_categories WHERE business_id = ?)`,
+  ).run(id, businessId);
+  return true;
 }
 
 export function findMenuItemByName(businessId: number, name: string) {

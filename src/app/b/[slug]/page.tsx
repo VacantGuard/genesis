@@ -3,6 +3,7 @@ import { PublicSite } from "@/components/public-site";
 import { currentCustomer } from "@/lib/customer-auth";
 import { getBusinessBySlug, getMenuWeekNote } from "@/lib/businesses";
 import { getPublicMenu } from "@/lib/menu";
+import { listReviews } from "@/lib/reviews";
 import { stripePublishableKey } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function BusinessMenuPage({ params }: { params: Promise<{ s
     <PublicSite
       profile={{ name: business.name, about: business.about, weekNote: getMenuWeekNote(business.id) }}
       menu={menu}
+      reviews={listReviews(business.id)}
       businessSlug={business.slug}
       accountName={account && account.businessId === business.id ? account.name : null}
       stripePublishableKey={stripePublishableKey(business.id)}

@@ -58,6 +58,9 @@ export function PublicHeader({
           <a href={section("about")} className="hidden hover:text-[#fc968a] sm:inline">
             About
           </a>
+          <a href={section("reviews")} className="hidden hover:text-[#fc968a] sm:inline">
+            Reviews
+          </a>
           <a href={section("pos")} className="hover:text-[#fc968a]">
             Order
           </a>
