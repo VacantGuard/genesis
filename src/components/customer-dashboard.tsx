@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatDeliveryDate } from "@/lib/delivery-dates";
 import { formatMoney, formatWhen } from "@/lib/format";
 import type { CustomerOrder } from "@/lib/customer-auth";
 
@@ -42,6 +43,9 @@ export function CustomerDashboard({
                   <span>{formatMoney(order.totalCents)}</span>
                 </div>
                 <p className="mt-2 text-[#5d7568]">{formatWhen(order.createdAt)}</p>
+                {order.deliveryDate ? (
+                  <p className="mt-1">Delivery {formatDeliveryDate(order.deliveryDate)}</p>
+                ) : null}
                 {order.items ? <p className="mt-2 leading-6">{order.items}</p> : null}
               </li>
             ))}

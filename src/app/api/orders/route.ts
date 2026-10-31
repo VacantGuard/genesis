@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getBusinessBySlug, getHomepageBusiness } from "@/lib/businesses";
 import { OrderError } from "@/lib/db";
 import { readDeliveryAddress, validateDeliveryAddress } from "@/lib/delivery";
+import { deliveryDateError, formatDeliveryDate } from "@/lib/delivery-dates";
 import { recordPaidOrder, recordZelleOrder } from "@/lib/order-alert";
 import { cleanLineNote, priceOrderLines } from "@/lib/orders";
 import { chargeCard, paidIntent, stripeSettings } from "@/lib/stripe";
@@ -18,6 +19,7 @@ type Body = {
   companyName?: string;
   notes?: string;
   smsOptIn?: boolean;
+  deliveryDate?: string;
   delivery?: {
     line1?: string;
     line2?: string;
@@ -64,6 +66,9 @@ export async function POST(request: Request) {
   if (deliveryError) {
     return NextResponse.json({ error: deliveryError }, { status: 400 });
   }
+  const deliveryDate = clean(body.deliveryDate, 10);
+  const dateError = deliveryDateError(deliveryDate);
+  if (dateError) return NextResponse.json({ error: dateError }, { status: 400 });
 
   const lines = Array.isArray(body.lines) ? body.lines : [];
   const merged = new Map<number, number>();
@@ -116,6 +121,7 @@ export async function POST(request: Request) {
         notes,
         smsOptIn: body.smsOptIn === true,
         cardLast4: "Zelle",
+        deliveryDate,
         delivery,
         lines: orderLines,
       });
@@ -123,6 +129,8 @@ export async function POST(request: Request) {
         orderNumber: saved.orderNumber,
         totalCents: saved.totalCents,
         customerName: saved.customerName,
+        deliveryDate: saved.deliveryDate,
+        deliveryDateLabel: formatDeliveryDate(saved.deliveryDate),
         deliveryAddress: saved.deliveryAddress,
         deliveryLocateUrl: saved.deliveryLocateUrl,
         items: saved.items,
@@ -159,6 +167,7 @@ export async function POST(request: Request) {
       city: delivery.city,
       state: delivery.state,
       postalCode: delivery.postalCode,
+      deliveryDate,
       lines: orderLines.map((line) => `${line.menuItemId}:${line.quantity}`).join(","),
     };
     for (const line of orderLines) {
@@ -209,6 +218,7 @@ export async function POST(request: Request) {
       smsOptIn: body.smsOptIn === true,
       cardLast4,
       stripePaymentIntentId,
+      deliveryDate,
       delivery,
       lines: orderLines,
     });
@@ -216,6 +226,8 @@ export async function POST(request: Request) {
       orderNumber: saved.orderNumber,
       totalCents: saved.totalCents,
       customerName: saved.customerName,
+      deliveryDate: saved.deliveryDate,
+      deliveryDateLabel: formatDeliveryDate(saved.deliveryDate),
       deliveryAddress: saved.deliveryAddress,
       deliveryLocateUrl: saved.deliveryLocateUrl,
       items: saved.items,

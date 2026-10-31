@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { DeliveryChoice } from "@/lib/delivery-dates";
 import { formatMoney, formatWhen } from "@/lib/format";
 import type { PublicReview } from "@/lib/reviews";
 import type { BusinessProfile, PublicCategory, PublicMenuItem } from "@/lib/types";
@@ -15,6 +16,7 @@ type Confirmation = {
   orderNumber: string;
   totalCents: number;
   customerName: string;
+  deliveryDateLabel?: string;
   deliveryAddress?: string;
   deliveryLocateUrl?: string;
   items: { name: string; quantity: number; unitPriceCents: number; note?: string }[];
@@ -59,6 +61,15 @@ function nutritionLine(item: PublicMenuItem) {
     else parts.push(`${raw}g protein`);
   }
   return parts.join(" | ");
+}
+
+function deliverySentence(confirmation: Confirmation) {
+  const when = confirmation.deliveryDateLabel ? ` ${confirmation.deliveryDateLabel}` : "";
+  if (confirmation.deliveryAddress) {
+    return ` and queued for delivery${when} to ${confirmation.deliveryAddress}`;
+  }
+  if (when) return ` and queued for delivery${when}`;
+  return "";
 }
 
 function weekSubtitle(note: string | undefined) {
@@ -106,6 +117,7 @@ export function PublicSite({
   accountName,
   stripePublishableKey,
   zelle,
+  deliveryChoices,
 }: {
   profile: BusinessProfile;
   menu: PublicCategory[];
@@ -114,6 +126,7 @@ export function PublicSite({
   accountName?: string | null;
   stripePublishableKey?: string | null;
   zelle?: { name: string; handle: string } | null;
+  deliveryChoices: DeliveryChoice[];
 }) {
   const [cart, setCart] = useState<Record<number, number>>({});
   const [customerName, setCustomerName] = useState("");
@@ -125,6 +138,7 @@ export function PublicSite({
   const [deliveryCity, setDeliveryCity] = useState("");
   const [deliveryState, setDeliveryState] = useState("");
   const [deliveryPostalCode, setDeliveryPostalCode] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState("");
   const [notes, setNotes] = useState("");
   const [lineNotes, setLineNotes] = useState<Record<number, string>>({});
   const [smsOptIn, setSmsOptIn] = useState(false);
@@ -357,6 +371,7 @@ export function PublicSite({
         state: deliveryState,
         postalCode: deliveryPostalCode,
       },
+      deliveryDate,
       businessSlug,
       lines: lines.map((line) => ({
         menuItemId: line.item.id,
@@ -494,9 +509,10 @@ export function PublicSite({
       deliveryLine1.trim().length < 2 ||
       deliveryCity.trim().length < 2 ||
       deliveryState.trim().length < 2 ||
-      deliveryPostalCode.trim().length < 5;
+      deliveryPostalCode.trim().length < 5 ||
+      !deliveryChoices.some((choice) => choice.date === deliveryDate);
     if (missing) {
-      setError("Enter your name, phone, email, and delivery address before Apple Pay.");
+      setError("Enter your name, phone, email, delivery address, and delivery date before Apple Pay.");
       return false;
     }
     return payWithCard();
@@ -750,10 +766,10 @@ export function PublicSite({
               <h2 className="font-serif text-4xl tracking-tight text-[#496252]">Order</h2>
               <p className="mt-3 max-w-md text-sm leading-6 text-[#5d7568]">
                 {canCard
-                  ? "Choose Apple Pay, a card, or Zelle. Apple Pay shows as its own button when this browser can use it. A Zelle order is paid after the kitchen confirms the transfer."
+                  ? "Choose Apple Pay, a card, or Zelle. Apple Pay shows as its own button when this browser can use it. A Zelle order is paid after the kitchen confirms the transfer. Delivery is Monday or Thursday."
                   : canZelle
-                    ? "Pay with Zelle. The kitchen confirms the transfer before the order is paid."
-                    : "Checkout is waiting on Stripe. Add the publishable key, secret key, and webhook secret under Business in the staff terminal. A payment is not taken until then."}
+                    ? "Pay with Zelle. The kitchen confirms the transfer before the order is paid. Delivery is Monday or Thursday."
+                    : "Checkout is waiting on Stripe. Add the publishable key, secret key, and webhook secret under Business in the staff terminal. A payment is not taken until then. Delivery is Monday or Thursday."}
               </p>
               <div className="mt-6 grid gap-3">
                 {lines.length === 0 ? (
@@ -816,8 +832,8 @@ export function PublicSite({
                 <h3 className="mt-2 font-serif text-4xl tracking-tight text-[#496252]">{confirmation.orderNumber}</h3>
                 <p className="mt-3 text-sm leading-6 text-[#5d7568]">
                   {confirmation.payment === "zelle"
-                    ? `${confirmation.customerName}, send ${formatMoney(confirmation.totalCents)} with Zelle to ${confirmation.zelleName} at ${confirmation.zelleHandle}. Put your name in the Zelle note. The kitchen confirms the transfer, then the order is paid${confirmation.deliveryAddress ? ` and queued for delivery to ${confirmation.deliveryAddress}` : ""}.`
-                    : `${confirmation.customerName}, your meal order is paid${confirmation.deliveryAddress ? ` and queued for delivery to ${confirmation.deliveryAddress}` : ""}. ${confirmation.wallet === "apple_pay" ? "Paid with Apple Pay." : confirmation.wallet === "google_pay" ? "Paid with Google Pay." : `Card ending ${confirmation.last4} was charged through Stripe.`}`}
+                    ? `${confirmation.customerName}, send ${formatMoney(confirmation.totalCents)} with Zelle to ${confirmation.zelleName} at ${confirmation.zelleHandle}. Put your name in the Zelle note. The kitchen confirms the transfer, then the order is paid${deliverySentence(confirmation)}.`
+                    : `${confirmation.customerName}, your meal order is paid${deliverySentence(confirmation)}. ${confirmation.wallet === "apple_pay" ? "Paid with Apple Pay." : confirmation.wallet === "google_pay" ? "Paid with Google Pay." : `Card ending ${confirmation.last4} was charged through Stripe.`}`}
                   {smsOptIn
                     ? ` You are enrolled in ${profile.name} menu texts. A confirmation text welcomes you to the program. Reply STOP to opt out or HELP for help.`
                     : ""}
@@ -947,6 +963,29 @@ export function PublicSite({
                       className={publicField}
                     />
                   </label>
+                  <fieldset className="grid gap-3 sm:col-span-2">
+                    <legend className="font-medium">Delivery date</legend>
+                    <p className="text-sm leading-6 text-[#5d7568]">
+                      Monday delivery closes Sunday at noon. Thursday delivery closes Wednesday at noon. An order
+                      placed Saturday can still choose the coming Thursday.
+                    </p>
+                    {deliveryChoices.map((choice) => (
+                      <label key={choice.date} className="flex items-start gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name="delivery-date"
+                          className="mt-1"
+                          required
+                          checked={deliveryDate === choice.date}
+                          onChange={() => setDeliveryDate(choice.date)}
+                        />
+                        <span>
+                          <span className="font-medium">{choice.label}</span>
+                          <span className="block text-[#5d7568]">Order by {choice.deadlineLabel}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
                   <label className="grid gap-1.5 text-sm sm:col-span-2">
                     <span className="font-medium">Prep notes</span>
                     <Textarea

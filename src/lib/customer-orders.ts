@@ -1,5 +1,5 @@
 import { getDb } from "./db";
-import { ensureOrderItemNoteColumn } from "./orders";
+import { ensureOrderDeliveryColumns, ensureOrderItemNoteColumn } from "./orders";
 
 export type CustomerOrderLine = {
   name: string;
@@ -16,6 +16,7 @@ export type CustomerOrderHistory = {
   createdAt: string;
   status: string;
   notes: string;
+  deliveryDate: string;
   items: CustomerOrderLine[];
 };
 
@@ -29,6 +30,7 @@ type OrderRow = {
   createdAt: string;
   status: string;
   notes: string;
+  deliveryDate: string;
 };
 
 function digits(phone: string) {
@@ -88,13 +90,14 @@ export function syncOrdersToCustomer(businessId: number, customerId: number, pho
     `UPDATE orders SET customer_id = ? WHERE id = ? AND business_id = ? AND customer_id IS NULL`,
   );
   for (const order of orders) {
-    if (orderMatches({ ...order, orderNumber: "", totalCents: 0, createdAt: "", status: "", notes: "" }, customerId, phone, email)) {
+    if (orderMatches({ ...order, orderNumber: "", totalCents: 0, createdAt: "", status: "", notes: "", deliveryDate: "" }, customerId, phone, email)) {
       claim.run(customerId, order.id, businessId);
     }
   }
 }
 
 function withItems(db: ReturnType<typeof getDb>, orders: OrderRow[]): CustomerOrderHistory[] {
+  ensureOrderDeliveryColumns(db);
   ensureOrderItemNoteColumn(db);
   const items = db.prepare(
     `SELECT item_name AS name, quantity, unit_price_cents AS unitPriceCents, notes AS note
@@ -108,6 +111,7 @@ function withItems(db: ReturnType<typeof getDb>, orders: OrderRow[]): CustomerOr
     createdAt: order.createdAt,
     status: order.status,
     notes: order.notes,
+    deliveryDate: order.deliveryDate || "",
     items: items.all(order.id) as CustomerOrderLine[],
   }));
 }
@@ -119,10 +123,12 @@ export function ordersForCustomerRecord(
   if (!customer.id) return [];
   syncOrdersToCustomer(businessId, customer.id, customer.phone, customer.email);
   const db = getDb();
+  ensureOrderDeliveryColumns(db);
   const orders = db
     .prepare(
       `SELECT id, order_number AS orderNumber, phone, email, customer_id AS customerId,
-              total_cents AS totalCents, created_at AS createdAt, status, notes
+              total_cents AS totalCents, created_at AS createdAt, status, notes,
+              delivery_date AS deliveryDate
        FROM orders WHERE business_id = ? AND customer_id = ?
        ORDER BY id DESC`,
     )

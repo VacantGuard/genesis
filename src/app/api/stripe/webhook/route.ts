@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { OrderError } from "@/lib/db";
 import { readDeliveryAddress } from "@/lib/delivery";
+import { deliveryDateError } from "@/lib/delivery-dates";
 import { recordPaidOrder } from "@/lib/order-alert";
 import { cleanLineNote, priceOrderLines } from "@/lib/orders";
 import { businessIdForWebhook, paidIntent } from "@/lib/stripe";
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
   try {
     const quote = priceOrderLines(businessId, lines);
     if (quote.totalCents !== paid.amountCents) return NextResponse.json({ received: true });
+    const deliveryDate = paid.metadata.deliveryDate || "";
+    if (deliveryDateError(deliveryDate)) return NextResponse.json({ received: true });
     const delivery = readDeliveryAddress({
       line1: paid.metadata.line1,
       line2: paid.metadata.line2,
@@ -64,6 +67,7 @@ export async function POST(request: Request) {
       smsOptIn: paid.metadata.smsOptIn === "1",
       cardLast4: paid.last4 || "CARD",
       stripePaymentIntentId: paid.paymentIntentId,
+      deliveryDate,
       delivery,
       lines,
     });

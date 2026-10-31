@@ -3,6 +3,7 @@ import { currentCustomer } from "@/lib/customer-auth";
 import { getHomepageBusiness, getMenuWeekNote } from "@/lib/businesses";
 import { getPublicMenu } from "@/lib/menu";
 import { listReviews } from "@/lib/reviews";
+import { deliveryChoices } from "@/lib/delivery-dates";
 import { stripePublishableKey } from "@/lib/stripe";
 import { zelleAccount } from "@/lib/zelle";
 
@@ -30,6 +31,7 @@ export default async function HomePage() {
       accountName={account?.name ?? null}
       stripePublishableKey={stripePublishableKey(business.id)}
       zelle={zelleAccount(business.id)}
+      deliveryChoices={deliveryChoices()}
     />
   );
 }

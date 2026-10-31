@@ -3,13 +3,14 @@ import {
   formatDeliveryAddress,
   type DeliveryAddress,
 } from "./delivery.ts";
+import { deliveryDateError } from "./delivery-dates.ts";
 import { upsertCustomerDeliveryFromOrder } from "./directory.ts";
 import { getDb, OrderError, type NewOrderInput } from "./db.ts";
 import type { DashboardStats, KitchenOrder } from "./types.ts";
 
 export type { NewOrderInput };
 
-function ensureOrderDeliveryColumns(db: ReturnType<typeof getDb>) {
+export function ensureOrderDeliveryColumns(db: ReturnType<typeof getDb>) {
   const cols = db.prepare("PRAGMA table_info(orders)").all() as { name: string }[];
   const names = new Set(cols.map((col) => col.name));
   for (const column of [
@@ -18,6 +19,7 @@ function ensureOrderDeliveryColumns(db: ReturnType<typeof getDb>) {
     "delivery_city",
     "delivery_state",
     "delivery_postal_code",
+    "delivery_date",
   ]) {
     if (!names.has(column)) {
       db.exec(`ALTER TABLE orders ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`);
@@ -107,6 +109,7 @@ function savedOrder(db: ReturnType<typeof getDb>, orderId: number) {
   const row = db
     .prepare(
       `SELECT id, order_number AS orderNumber, customer_name AS customerName, total_cents AS totalCents,
+              delivery_date AS deliveryDate,
               delivery_line1 AS deliveryLine1, delivery_line2 AS deliveryLine2, delivery_city AS deliveryCity,
               delivery_state AS deliveryState, delivery_postal_code AS deliveryPostalCode
        FROM orders WHERE id = ?`,
@@ -117,6 +120,7 @@ function savedOrder(db: ReturnType<typeof getDb>, orderId: number) {
         orderNumber: string;
         customerName: string;
         totalCents: number;
+        deliveryDate: string;
         deliveryLine1: string;
         deliveryLine2: string;
         deliveryCity: string;
@@ -139,6 +143,7 @@ function savedOrder(db: ReturnType<typeof getDb>, orderId: number) {
     orderNumber: row.orderNumber,
     totalCents: row.totalCents,
     customerName: row.customerName,
+    deliveryDate: row.deliveryDate || "",
     deliveryAddress: delivery.deliveryAddress,
     deliveryLocateUrl: delivery.deliveryLocateUrl,
     items,
@@ -174,6 +179,9 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
     }
     const { priced, totalCents } = priceOrderLines(businessId, input.lines);
     ensureOrderDeliveryColumns(db);
+    const dateError = deliveryDateError(input.deliveryDate ?? "");
+    if (dateError) throw new OrderError(dateError);
+    const deliveryDate = input.deliveryDate ?? "";
     const delivery = input.delivery ?? {
       line1: "",
       line2: "",
@@ -187,8 +195,8 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
       .prepare(
         `INSERT INTO orders
           (order_number, customer_name, phone, email, company_name, notes, card_last4, total_cents, status, created_at, business_id, sms_opt_in,
-           delivery_line1, delivery_line2, delivery_city, delivery_state, delivery_postal_code, stripe_payment_intent_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           delivery_date, delivery_line1, delivery_line2, delivery_city, delivery_state, delivery_postal_code, stripe_payment_intent_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         orderNumber,
@@ -203,6 +211,7 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
         createdAt,
         businessId,
         input.smsOptIn ? 1 : 0,
+        deliveryDate,
         delivery.line1,
         delivery.line2,
         delivery.city,
@@ -230,6 +239,7 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
       orderNumber,
       totalCents,
       customerName: input.customerName,
+      deliveryDate,
       deliveryAddress: formatDeliveryAddress(delivery),
       deliveryLocateUrl: deliveryLocateUrl(delivery),
       items: priced,
@@ -257,6 +267,7 @@ export function listOrders(businessId: number): KitchenOrder[] {
       `SELECT id, order_number AS orderNumber, customer_name AS customerName, phone, email,
               company_name AS companyName, notes, card_last4 AS cardLast4,
               total_cents AS totalCents, status, created_at AS createdAt,
+              delivery_date AS deliveryDate,
               delivery_line1 AS deliveryLine1, delivery_line2 AS deliveryLine2,
               delivery_city AS deliveryCity, delivery_state AS deliveryState,
               delivery_postal_code AS deliveryPostalCode
@@ -288,6 +299,7 @@ export function orderExportRows(businessId: number) {
     .prepare(
       `SELECT o.order_number AS orderNumber, o.customer_name AS customerName,
               o.company_name AS companyName, o.phone, o.email,
+              o.delivery_date AS deliveryDate,
               o.delivery_line1 AS deliveryLine1, o.delivery_line2 AS deliveryLine2,
               o.delivery_city AS deliveryCity, o.delivery_state AS deliveryState,
               o.delivery_postal_code AS deliveryPostalCode,
@@ -306,6 +318,7 @@ export function orderExportRows(businessId: number) {
         companyName: string;
         phone: string;
         email: string;
+        deliveryDate: string;
         deliveryLine1: string;
         deliveryLine2: string;
         deliveryCity: string;
@@ -325,6 +338,7 @@ export function orderExportRows(businessId: number) {
         companyName: order.companyName,
         phone: order.phone,
         email: order.email,
+        deliveryDate: order.deliveryDate || "",
         deliveryAddress: delivery.deliveryAddress,
         deliveryLocateUrl: delivery.deliveryLocateUrl,
         item: order.item,

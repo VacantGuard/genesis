@@ -23,6 +23,7 @@ export type NewOrderInput = {
   orderStatus?: "paid" | "zelle";
   smsOptIn?: boolean;
   stripePaymentIntentId?: string;
+  deliveryDate?: string;
   delivery?: {
     line1: string;
     line2: string;
