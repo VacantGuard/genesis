@@ -3,6 +3,7 @@ import { getBusiness } from "./businesses.ts";
 import { formatDeliveryDate } from "./delivery-dates.ts";
 import { formatMoney } from "./format.ts";
 import { placeOrder } from "./orders.ts";
+import { postBusinessSlack } from "./slack-post.ts";
 import type { NewOrderInput } from "./db.ts";
 
 type AlertItem = { name: string; quantity: number; note: string };
@@ -59,6 +60,11 @@ async function notifyNewOrder(
     deliveryAddress: order.deliveryAddress,
     paymentNote: order.paymentNote,
   });
+  const slack = await postBusinessSlack(business.id, "orders", summary);
+  if (slack.configured) {
+    if (!slack.ok) console.error("Order Slack alert failed", slack.detail);
+    return;
+  }
   const posted = await postAgentWebhook(business.id, {
     event: "order.created",
     business: business.name,

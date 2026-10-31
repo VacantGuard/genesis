@@ -20,7 +20,7 @@ type TextCredentials = {
   fromNumber: string;
 };
 
-function ensureTextColumns() {
+export function ensureTextColumns() {
   const db = getDb();
   const columns = db.prepare("PRAGMA table_info(businesses)").all() as { name: string }[];
   const names = new Set(columns.map((column) => column.name));
