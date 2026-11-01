@@ -69,11 +69,33 @@ export function claimInboundText(businessId: number, messageSid: string, fromPho
   return inserted.changes === 1;
 }
 
-export function inboundSlackText(input: { from: string; body: string; mediaCount: number }) {
+export function clientNameForPhone(businessId: number, from: string) {
+  const key = phoneKey(from);
+  if (key.length < 7) return "";
+  const customers = getDb()
+    .prepare(`SELECT name, phone FROM customers WHERE business_id = ?`)
+    .all(businessId) as { name: string; phone: string }[];
+  const customer = customers.find((row) => phoneKey(row.phone) === key && row.name.trim());
+  if (customer) return customer.name.trim();
+  const companies = getDb()
+    .prepare(`SELECT name, contact_name AS contactName, phone FROM companies WHERE business_id = ?`)
+    .all(businessId) as { name: string; contactName: string; phone: string }[];
+  const company = companies.find((row) => phoneKey(row.phone) === key);
+  if (!company) return "";
+  return company.contactName.trim() || company.name.trim();
+}
+
+function phoneKey(phone: string) {
+  const value = phone.replace(/\D/g, "");
+  return value.length > 10 ? value.slice(-10) : value;
+}
+
+export function inboundSlackText(input: { from: string; name?: string; body: string; mediaCount: number }) {
+  const who = input.name?.trim() || input.from;
   const said = input.body.trim() || "(no message)";
   const sentence = /[.!?]$/.test(said) ? said : `${said}.`;
   const photo = input.mediaCount > 0 ? " A photo was attached." : "";
-  return `Text from ${input.from}: ${sentence}${photo}`;
+  return `Text from ${who}: ${sentence}${photo}`;
 }
 
 export async function receiveInboundText(input: {
@@ -88,7 +110,12 @@ export async function receiveInboundText(input: {
   const posted = await postBusinessSlack(
     input.businessId,
     "texts",
-    inboundSlackText({ from: input.from, body: input.body, mediaCount: input.mediaCount }),
+    inboundSlackText({
+      from: input.from,
+      name: clientNameForPhone(input.businessId, input.from),
+      body: input.body,
+      mediaCount: input.mediaCount,
+    }),
   );
   return { posted: posted.ok, duplicate: false, detail: posted.detail };
 }
