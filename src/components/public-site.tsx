@@ -63,6 +63,34 @@ function nutritionLine(item: PublicMenuItem) {
   return parts.join(" | ");
 }
 
+function cartStorageKey(businessSlug: string) {
+  return `tigeats-cart:${businessSlug}`;
+}
+
+function readStoredCart(raw: string | null) {
+  const cart: Record<number, number> = {};
+  const notes: Record<number, string> = {};
+  if (!raw) return { cart, notes };
+  try {
+    const parsed = JSON.parse(raw) as { cart?: Record<string, unknown>; notes?: Record<string, unknown> };
+    for (const [id, quantity] of Object.entries(parsed.cart ?? {})) {
+      const menuItemId = Number(id);
+      const count = Number(quantity);
+      if (!Number.isInteger(menuItemId) || !Number.isInteger(count) || count < 1 || count > 25) continue;
+      cart[menuItemId] = count;
+    }
+    for (const [id, note] of Object.entries(parsed.notes ?? {})) {
+      const menuItemId = Number(id);
+      if (!cart[menuItemId]) continue;
+      const text = String(note ?? "").trim().slice(0, 200);
+      if (text) notes[menuItemId] = text;
+    }
+  } catch {
+    return { cart: {}, notes: {} };
+  }
+  return { cart, notes };
+}
+
 function deliverySentence(confirmation: Confirmation) {
   const when = confirmation.deliveryDateLabel ? ` ${confirmation.deliveryDateLabel}` : "";
   if (confirmation.deliveryAddress) {
@@ -141,6 +169,7 @@ export function PublicSite({
   const [deliveryDate, setDeliveryDate] = useState("");
   const [notes, setNotes] = useState("");
   const [lineNotes, setLineNotes] = useState<Record<number, string>>({});
+  const [cartReady, setCartReady] = useState(false);
   const [smsOptIn, setSmsOptIn] = useState(false);
   const canCard = Boolean(stripePublishableKey);
   const canZelle = Boolean(zelle?.handle);
@@ -163,6 +192,22 @@ export function PublicSite({
   const [reviewError, setReviewError] = useState("");
   const [reviewPending, setReviewPending] = useState(false);
   const weekLine = weekSubtitle(profile.weekNote);
+  const storedCartKey = cartStorageKey(businessSlug);
+
+  useEffect(() => {
+    const stored = readStoredCart(localStorage.getItem(storedCartKey));
+    setCart(stored.cart);
+    setLineNotes(stored.notes);
+    setCartReady(true);
+  }, [storedCartKey]);
+
+  useEffect(() => {
+    if (!cartReady) return;
+    const savedNotes = Object.fromEntries(
+      Object.entries(lineNotes).filter(([id, note]) => cart[Number(id)] && note.trim()),
+    );
+    localStorage.setItem(storedCartKey, JSON.stringify({ cart, notes: savedNotes }));
+  }, [cart, cartReady, lineNotes, storedCartKey]);
 
   const lookup = useMemo(() => {
     const map = new Map<number, PublicCategory["items"][number]>();
@@ -404,6 +449,11 @@ export function PublicSite({
   async function pay(event: React.FormEvent) {
     event.preventDefault();
     setError("");
+    if (!deliveryChoices.some((choice) => choice.date === deliveryDate)) {
+      setError("Pick a delivery date.");
+      document.getElementById("delivery-date")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     if (method === "zelle") {
       if (!zelle) {
         setError("Zelle is not set up on this menu.");
@@ -963,7 +1013,7 @@ export function PublicSite({
                       className={publicField}
                     />
                   </label>
-                  <fieldset className="grid gap-3 sm:col-span-2">
+                  <fieldset id="delivery-date" className="grid gap-3 sm:col-span-2">
                     <legend className="font-medium">Delivery date</legend>
                     <p className="text-sm leading-6 text-[#5d7568]">
                       Monday delivery closes Sunday at noon. Thursday delivery closes Wednesday at noon. An order
@@ -975,7 +1025,6 @@ export function PublicSite({
                           type="radio"
                           name="delivery-date"
                           className="mt-1"
-                          required
                           checked={deliveryDate === choice.date}
                           onChange={() => setDeliveryDate(choice.date)}
                         />
@@ -1081,17 +1130,13 @@ export function PublicSite({
                   </span>
                 </label>
                 {canCard || canZelle ? (
-                  <Button
+                  <button
                     type="submit"
-                    disabled={pending || lines.length === 0 || (method === "card" && !paymentReady) || (method === "zelle" && !zelle)}
-                    className={`mt-2 ${publicButton}`}
+                    disabled={pending || lines.length === 0}
+                    className={`mt-2 inline-flex items-center justify-center disabled:opacity-50 ${publicButton}`}
                   >
-                    {pending
-                      ? "Sending…"
-                      : method === "zelle"
-                        ? `Place Zelle order · ${formatMoney(total)}`
-                        : `Pay ${formatMoney(total)}`}
-                  </Button>
+                    {pending ? "Sending…" : `Place order · ${formatMoney(total)}`}
+                  </button>
                 ) : null}
               </form>
             )}
