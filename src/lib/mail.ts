@@ -3,7 +3,15 @@ import { connect as netConnect, type Socket } from "node:net";
 import path from "node:path";
 import { connect as tlsConnect, type TLSSocket } from "node:tls";
 
-export type MailMessage = { to: string; subject: string; text: string };
+export type MailMessage = { to: string; subject: string; text: string; replyTo?: string };
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function mailReplyAddress() {
+  const value = process.env.SMTP_REPLY_TO?.trim() ?? "";
+  if (!value || /[\r\n]/.test(value) || !EMAIL.test(value)) return "";
+  return value;
+}
 
 type SmtpSettings = {
   host: string;
@@ -171,9 +179,10 @@ async function smtpSend(settings: SmtpSettings, message: MailMessage) {
     session.command("DATA");
     await expect(session, "354");
     const text = message.text.replace(/\r?\n/g, "\r\n").replace(/^\./gm, "..");
-    session.write(
-      [`From: ${settings.from}`, `To: ${message.to}`, `Subject: ${message.subject}`, "Content-Type: text/plain; charset=utf-8", "", text, ".", ""].join("\r\n"),
-    );
+    const headers = [`From: ${settings.from}`, `To: ${message.to}`, `Subject: ${message.subject}`];
+    if (message.replyTo) headers.push(`Reply-To: ${message.replyTo}`);
+    headers.push("Content-Type: text/plain; charset=utf-8", "", text, ".", "");
+    session.write(headers.join("\r\n"));
     await expect(session, "250");
     session.command("QUIT");
     session.close();
@@ -187,13 +196,18 @@ export async function sendMail(
   message: MailMessage,
   options?: { logName?: string },
 ): Promise<{ ok: true; mode: "sent" | "logged" } | { ok: false; error: string }> {
-  if (/[\r\n]/.test(message.to) || /[\r\n]/.test(message.subject) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(message.to)) {
+  const replyTo = message.replyTo?.trim() || mailReplyAddress();
+  if (/[\r\n]/.test(message.to) || /[\r\n]/.test(message.subject) || !EMAIL.test(message.to)) {
     return { ok: false, error: "That email address cannot be used." };
   }
+  if (replyTo && (/[\r\n]/.test(replyTo) || !EMAIL.test(replyTo))) {
+    return { ok: false, error: "That email address cannot be used." };
+  }
+  const outgoing = replyTo ? { ...message, replyTo } : message;
   const smtp = smtpSettings();
   if (smtp) {
     try {
-      await smtpSend(smtp, message);
+      await smtpSend(smtp, outgoing);
       return { ok: true, mode: "sent" };
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Email failed.";
@@ -206,7 +220,12 @@ export async function sendMail(
   const dir = path.join(process.cwd(), "data");
   mkdirSync(dir, { recursive: true });
   const file = options?.logName?.replace(/[^\w.-]/g, "") || "last-mail.txt";
-  writeFileSync(path.join(dir, file), `To: ${message.to}\nSubject: ${message.subject}\n\n${message.text}\n`, "utf8");
+  const replyLine = outgoing.replyTo ? `Reply-To: ${outgoing.replyTo}\n` : "";
+  writeFileSync(
+    path.join(dir, file),
+    `To: ${outgoing.to}\n${replyLine}Subject: ${outgoing.subject}\n\n${outgoing.text}\n`,
+    "utf8",
+  );
   return { ok: true, mode: "logged" };
 }
 

@@ -1,6 +1,6 @@
 import { formatDeliveryDate } from "./delivery-dates.ts";
 import { formatMoney } from "./format.ts";
-import { sendMail } from "./mail.ts";
+import { mailReplyAddress, sendMail } from "./mail.ts";
 
 type ReceiptItem = { name: string; quantity: number; unitPriceCents: number; note?: string };
 
@@ -51,6 +51,7 @@ export function orderReceiptMessage(input: OrderReceiptInput) {
       return note ? `${line}\n  ${note}` : line;
     })
     .join("\n");
+  const replyTo = mailReplyAddress();
   const when = formatDeliveryDate(input.deliveryDate ?? "");
   const address = oneLine(input.deliveryAddress);
   const company = oneLine(input.companyName);
@@ -72,6 +73,7 @@ export function orderReceiptMessage(input: OrderReceiptInput) {
     details.join("\n"),
     "",
     paymentParagraph(input),
+    ...(replyTo ? ["", `Questions about this order? Reply to ${replyTo}.`] : []),
   ]
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
