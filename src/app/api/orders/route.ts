@@ -6,6 +6,7 @@ import { deliveryDateError, formatDeliveryDate } from "@/lib/delivery-dates";
 import { recordPaidOrder, recordZelleOrder } from "@/lib/order-alert";
 import { cleanLineNote, priceOrderLines } from "@/lib/orders";
 import { chargeCard, paidIntent, stripeSettings } from "@/lib/stripe";
+import { deskIsOpen, GO_LIVE_MESSAGE } from "@/lib/go-live";
 import { zelleAccount } from "@/lib/zelle";
 
 export const runtime = "nodejs";
@@ -38,6 +39,7 @@ function clean(value: unknown, max: number) {
 }
 
 export async function POST(request: Request) {
+  if (!deskIsOpen()) return NextResponse.json({ error: GO_LIVE_MESSAGE }, { status: 403 });
   let body: Body;
   try {
     body = (await request.json()) as Body;

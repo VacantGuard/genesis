@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { requireSession, setSessionCookie } from "@/lib/auth";
+import { deskIsOpen, GO_LIVE_MESSAGE } from "@/lib/go-live";
 import { claimStaffInvite, createStaffInvite } from "@/lib/staff-access";
 import { clearCampaignHistory } from "@/lib/texts";
 
@@ -32,6 +33,7 @@ export async function clearCampaignHistoryAction() {
 export async function claimStaffInviteAction(formData: FormData) {
   const token = field(formData, "token").trim();
   const back = `/terminal/join/${encodeURIComponent(token)}`;
+  if (!deskIsOpen()) redirect(`${back}?error=${encodeURIComponent(GO_LIVE_MESSAGE)}`);
   try {
     const username = claimStaffInvite({
       token,

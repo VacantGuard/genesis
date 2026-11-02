@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { LaunchAnticipation } from "@/components/launch-anticipation";
 import { claimStaffInviteAction } from "@/lib/staff-actions";
+import { deskIsOpen } from "@/lib/go-live";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Create staff login" };
 
 export default async function JoinStaffPage({
@@ -14,6 +17,7 @@ export default async function JoinStaffPage({
 }) {
   const { token } = await params;
   const query = await searchParams;
+  if (!deskIsOpen()) return <LaunchAnticipation />;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12">

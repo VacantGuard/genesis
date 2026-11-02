@@ -4,11 +4,13 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect, unstable_rethrow } from "next/navigation";
 import {
+  ADMIN_USERNAME,
   clearSessionCookie,
   credentialsMatch,
   requireSession,
   setSessionCookie,
 } from "@/lib/auth";
+import { deskIsOpen, GO_LIVE_MESSAGE } from "@/lib/go-live";
 import { publishMenuUpdate } from "@/lib/agent";
 import { menuLink, setMenuWeekNote, updateBusinessProfile, type BusinessRecord } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
@@ -85,6 +87,9 @@ function optionalId(raw: string) {
 export async function loginAction(_state: LoginState, formData: FormData): Promise<LoginState> {
   const username = field(formData, "username");
   const password = field(formData, "password");
+  if (!deskIsOpen() && username !== ADMIN_USERNAME) {
+    return { error: GO_LIVE_MESSAGE };
+  }
   if (!credentialsMatch(username, password)) {
     return { error: "Those credentials do not match the staff login." };
   }

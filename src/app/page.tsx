@@ -1,6 +1,8 @@
+import { LaunchAnticipation } from "@/components/launch-anticipation";
 import { PublicSite } from "@/components/public-site";
 import { currentCustomer } from "@/lib/customer-auth";
 import { getHomepageBusiness, getMenuWeekNote } from "@/lib/businesses";
+import { deskIsOpen } from "@/lib/go-live";
 import { getPublicMenu } from "@/lib/menu";
 import { listReviews } from "@/lib/reviews";
 import { deliveryChoices } from "@/lib/delivery-dates";
@@ -11,6 +13,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function generateMetadata() {
+  if (!deskIsOpen()) {
+    return { title: "TigEats", description: "The site will go live Tuesday at 11:00am Central." };
+  }
   const business = getHomepageBusiness();
   return {
     title: business.name,
@@ -19,6 +24,7 @@ export async function generateMetadata() {
 }
 
 export default async function HomePage() {
+  if (!deskIsOpen()) return <LaunchAnticipation />;
   const business = getHomepageBusiness();
   const menu = getPublicMenu(business.id);
   const account = await currentCustomer();

@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { clearCustomerSession, signInCustomer, signUpCustomer } from "./customer-auth";
 import { requestPasswordReset, resetCustomerPassword } from "./customer-reset";
+import { deskIsOpen, GO_LIVE_MESSAGE } from "./go-live";
 
 export type AccountFormState = { error: string };
 
@@ -18,6 +19,7 @@ async function requestOrigin() {
 }
 
 export async function signUpAction(_state: AccountFormState, formData: FormData): Promise<AccountFormState> {
+  if (!deskIsOpen()) return { error: GO_LIVE_MESSAGE };
   const result = await signUpCustomer({
     name: String(formData.get("name") ?? ""),
     phone: String(formData.get("phone") ?? ""),
@@ -29,6 +31,7 @@ export async function signUpAction(_state: AccountFormState, formData: FormData)
 }
 
 export async function signInAction(_state: AccountFormState, formData: FormData): Promise<AccountFormState> {
+  if (!deskIsOpen()) return { error: GO_LIVE_MESSAGE };
   const result = await signInCustomer({
     email: String(formData.get("email") ?? ""),
     password: String(formData.get("password") ?? ""),
@@ -43,6 +46,7 @@ export async function signOutAction() {
 }
 
 export async function requestResetAction(_state: ResetRequestState, formData: FormData): Promise<ResetRequestState> {
+  if (!deskIsOpen()) return { error: GO_LIVE_MESSAGE, sent: false, logged: false };
   const result = await requestPasswordReset({
     phone: String(formData.get("phone") ?? ""),
     linkUrl: `${await requestOrigin()}/account/reset`,
@@ -52,6 +56,7 @@ export async function requestResetAction(_state: ResetRequestState, formData: Fo
 }
 
 export async function confirmResetAction(_state: AccountFormState, formData: FormData): Promise<AccountFormState> {
+  if (!deskIsOpen()) return { error: GO_LIVE_MESSAGE };
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirm") ?? "");
   if (password !== confirm) return { error: "Those passwords do not match." };

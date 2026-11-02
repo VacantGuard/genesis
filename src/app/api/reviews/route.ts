@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { getBusinessBySlug, getHomepageBusiness } from "@/lib/businesses";
+import { deskIsOpen, GO_LIVE_MESSAGE } from "@/lib/go-live";
 import { addReview } from "@/lib/reviews";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  if (!deskIsOpen()) return NextResponse.json({ error: GO_LIVE_MESSAGE }, { status: 403 });
   let body: { businessSlug?: string; author?: string; rating?: number; body?: string };
   try {
     body = (await request.json()) as typeof body;
