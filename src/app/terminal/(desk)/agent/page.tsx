@@ -102,8 +102,8 @@ export default async function AgentPage({
         <p className="text-muted-foreground">
           Text clients with POST /api/agent/texts and the same Bearer token. The body is{" "}
           {`{"message":"This week's menu is ready."}`} and the menu link is added for you. The
-          reply names each recipient, their phone, and whether that text sent or failed. A text
-          platform has to be saved on Texts first, or the send is only logged.
+          reply names each recipient, their phone, and whether that text sent or failed. Twilio
+          has to be saved on Texts first, or the send is only logged.
         </p>
         <p className="text-muted-foreground">
           The public menu JSON is GET /api/menu and does not need the token. The Slack workspace id
@@ -139,7 +139,7 @@ Read the payment board like this. A paid line is: client number | name | phone |
 
 List every client the tool returned. Do not answer with a count only. Group them as paid and not paid. Put the client number on every line. Include the phone. Include the order number on paid lines.
 
-When staff ask you to text clients, call the text tool and put their requested wording in the message field. The menu link is added for you. Texts go through Sendblue. The tool returns each recipient with a client number, a status, and a detail. Repeat those. If a send fails because the contact must be verified, tell staff to text +1 645 243 7121 from that client's phone first. Do not mention Twilio.
+When staff ask you to text clients, call the text tool and put their requested wording in the message field. The menu link is added for you. Texts go through Twilio. The tool returns each recipient with a client number, a status, and a detail. Repeat those. If a send fails, repeat the detail and stop. Do not invent a verification phone number.
 
 There is no duplicate-text block. If staff ask to send again, or say override, call the text tool again even if that client already received this week's menu. Do not refuse a resend, and do not invent a safeguard.
 
