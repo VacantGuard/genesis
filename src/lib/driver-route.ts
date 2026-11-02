@@ -3,6 +3,7 @@ import { formatDeliveryDate } from "./delivery-dates.ts";
 import { getDb } from "./db.ts";
 import { sendTextMessage, textCredentials, toE164 } from "./messaging.ts";
 import { ensureOrderDeliveryColumns } from "./orders.ts";
+import { orderByDistance, type Point } from "./route-order.ts";
 
 export type Driver = {
   id: number;
@@ -24,6 +25,7 @@ export type DeliveryRoute = {
   missing: { orderNumber: string; customerName: string }[];
   directionsUrl: string;
   mapCoversAllStops: boolean;
+  orderedBy: "drive" | "distance" | "zip";
   message: string;
 };
 
@@ -46,6 +48,14 @@ function ensureDriverSchema() {
   if (!names.has("route_start_address")) {
     db.exec("ALTER TABLE businesses ADD COLUMN route_start_address TEXT NOT NULL DEFAULT ''");
   }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS geocodes (
+      address TEXT PRIMARY KEY,
+      lat REAL NOT NULL,
+      lng REAL NOT NULL,
+      found INTEGER NOT NULL
+    );
+  `);
 }
 
 export function listDrivers(businessId: number): Driver[] {
@@ -119,7 +129,72 @@ function chicagoToday() {
   }).format(new Date());
 }
 
-export function deliveryRoute(businessId: number, date?: string): DeliveryRoute {
+async function locateAddress(address: string): Promise<Point | null> {
+  const db = getDb();
+  const cached = db
+    .prepare("SELECT lat, lng, found FROM geocodes WHERE address = ?")
+    .get(address) as { lat: number; lng: number; found: number } | undefined;
+  if (cached) return cached.found ? { lat: cached.lat, lng: cached.lng } : null;
+  const url = new URL("https://geocoding.geo.census.gov/geocoder/locations/onelineaddress");
+  url.searchParams.set("address", address);
+  url.searchParams.set("benchmark", "Public_AR_Current");
+  url.searchParams.set("format", "json");
+  try {
+    const response = await fetch(url, {
+      headers: { "user-agent": "tigeats-route" },
+      signal: AbortSignal.timeout(8000),
+    });
+    const body = (await response.json()) as {
+      result?: { addressMatches?: { coordinates?: { x?: number; y?: number } }[] };
+    };
+    const match = body.result?.addressMatches?.[0]?.coordinates;
+    const lat = Number(match?.y);
+    const lng = Number(match?.x);
+    const found = Number.isFinite(lat) && Number.isFinite(lng);
+    db.prepare("INSERT OR REPLACE INTO geocodes (address, lat, lng, found) VALUES (?, ?, ?, ?)").run(
+      address,
+      found ? lat : 0,
+      found ? lng : 0,
+      found ? 1 : 0,
+    );
+    return found ? { lat, lng } : null;
+  } catch {
+    return null;
+  }
+}
+
+async function drivingOrder(start: Point | null, points: Point[]) {
+  const coords = start ? [start, ...points] : points;
+  if (coords.length < 2) return points.map((_, index) => index);
+  const path = coords.map((point) => `${point.lng},${point.lat}`).join(";");
+  const params = new URLSearchParams({ overview: "false", roundtrip: "false" });
+  if (start) params.set("source", "first");
+  else {
+    params.set("source", "any");
+    params.set("destination", "any");
+  }
+  try {
+    const response = await fetch(`https://router.project-osrm.org/trip/v1/driving/${path}?${params}`, {
+      headers: { "user-agent": "tigeats-route" },
+      signal: AbortSignal.timeout(8000),
+    });
+    const body = (await response.json()) as { code?: string; waypoints?: { waypoint_index?: number }[] };
+    if (body.code !== "Ok" || !body.waypoints || body.waypoints.length !== coords.length) return null;
+    const ranked = body.waypoints.map((waypoint, inputIndex) => ({
+      inputIndex,
+      trip: waypoint.waypoint_index ?? inputIndex,
+    }));
+    ranked.sort((a, b) => a.trip - b.trip);
+    return ranked.map((item) => item.inputIndex).flatMap((inputIndex) => {
+      if (start && inputIndex === 0) return [];
+      return [start ? inputIndex - 1 : inputIndex];
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function deliveryRoute(businessId: number, date?: string): Promise<DeliveryRoute> {
   ensureDriverSchema();
   const db = getDb();
   ensureOrderDeliveryColumns(db);
@@ -178,17 +253,55 @@ export function deliveryRoute(businessId: number, date?: string): DeliveryRoute 
       postal: address.postalCode,
     });
   }
-  const stops = [...grouped.values()]
-    .sort((a, b) => a.postal.localeCompare(b.postal) || a.address.localeCompare(b.address))
-    .map(({ names, address, orderNumbers }) => ({ names, address, orderNumbers }));
+  const groupedStops = [...grouped.values()];
   const start = routeStartAddress(businessId);
+  const startPoint = start ? await locateAddress(start) : null;
+  const located = [];
+  for (const stop of groupedStops) {
+    located.push({ ...stop, point: await locateAddress(stop.address) });
+  }
+  const placed = located.filter((stop) => stop.point);
+  const unplaced = located.filter((stop) => !stop.point);
+  let orderedBy: DeliveryRoute["orderedBy"] = "zip";
+  let orderedPlaced = placed;
+  if (placed.length > 1 && placed.every((stop) => stop.point)) {
+    const points = placed.map((stop) => stop.point as Point);
+    const drive = await drivingOrder(startPoint, points);
+    if (drive && drive.length === placed.length) {
+      orderedPlaced = drive.map((index) => placed[index]);
+      orderedBy = "drive";
+    } else {
+      orderedPlaced = orderByDistance(startPoint, points).map((index) => placed[index]);
+      orderedBy = "distance";
+    }
+  } else if (placed.length === 1) {
+    orderedBy = startPoint ? "drive" : "distance";
+  } else {
+    orderedPlaced = [...placed].sort((a, b) => a.postal.localeCompare(b.postal) || a.address.localeCompare(b.address));
+  }
+  const unplacedSorted = [...unplaced].sort(
+    (a, b) => a.postal.localeCompare(b.postal) || a.address.localeCompare(b.address),
+  );
+  const stops = [...orderedPlaced, ...unplacedSorted].map(({ names, address, orderNumbers }) => ({
+    names,
+    address,
+    orderNumbers,
+  }));
   const url = directionsUrl(start, stops.map((stop) => stop.address));
   const label = formatDeliveryDate(chosen) || chosen;
+  const orderNote =
+    orderedBy === "drive"
+      ? "Drive the stops in this order."
+      : orderedBy === "distance"
+        ? "Stops are ordered by distance from the start."
+        : "Stops are in ZIP order because the map could not place them.";
   const lines = [
     `TigEats delivery ${label}`,
     start ? `Start: ${start}` : "",
+    orderNote,
     ...stops.map((stop, index) => `${index + 1}. ${stop.names} — ${stop.address}`),
     missing.length ? `No address: ${missing.map((order) => `${order.orderNumber} ${order.customerName}`).join("; ")}` : "",
+    unplaced.length ? "Stops that could not be placed on the map are listed last." : "",
     stops.length > MAP_STOPS ? `The map link includes the first ${MAP_STOPS} stops.` : "",
     url ? `Route: ${url}` : "",
   ].filter(Boolean);
@@ -200,12 +313,13 @@ export function deliveryRoute(businessId: number, date?: string): DeliveryRoute 
     missing,
     directionsUrl: url,
     mapCoversAllStops: stops.length <= MAP_STOPS,
+    orderedBy,
     message: lines.join("\n"),
   };
 }
 
 export async function sendDriverRoute(input: { businessId: number; date?: string; phones?: string[] }) {
-  const route = deliveryRoute(input.businessId, input.date);
+  const route = await deliveryRoute(input.businessId, input.date);
   if (route.stops.length === 0) {
     throw new Error(
       route.missing.length

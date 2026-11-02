@@ -30,8 +30,9 @@ export default async function OrdersPage() {
         <div>
           <h2 className="font-heading text-2xl tracking-tight">Drivers</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Ask the agent in Slack for a delivery date and it texts these numbers the stops, in ZIP order, with a
-            Google Maps route. Card and Zelle orders for that date are included.
+            Ask the agent in Slack for a delivery date and it texts these numbers the stops. The order follows
+            driving time from the map start, so the driver is not sent back across the city. Put the kitchen address
+            in Map start. Card and Zelle orders for that date are included.
           </p>
         </div>
         <form action={saveRouteStartAction} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">

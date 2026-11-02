@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   }
   const date = new URL(request.url).searchParams.get("date") ?? "";
   try {
-    return NextResponse.json({ business: business.name, ...deliveryRoute(business.id, date) });
+    return NextResponse.json({ business: business.name, ...(await deliveryRoute(business.id, date)) });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "The route could not be built.";
     return NextResponse.json({ error: detail }, { status: 400 });
