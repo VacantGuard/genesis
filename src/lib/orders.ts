@@ -1,3 +1,4 @@
+import { checkoutUnitCents } from "./checkout-price.ts";
 import {
   deliveryLocateUrl,
   formatDeliveryAddress,
@@ -80,24 +81,24 @@ export function priceOrderLines(businessId: number, lines: NewOrderInput["lines"
     }
     const item = db
       .prepare(
-        `SELECT i.name, i.price_cents AS priceCents, i.available
+        `SELECT i.name, i.available
          FROM menu_items i
          JOIN menu_categories c ON c.id = i.category_id
          WHERE i.id = ? AND c.business_id = ?`,
       )
-      .get(line.menuItemId, businessId) as
-      | { name: string; priceCents: number; available: number }
-      | undefined;
+      .get(line.menuItemId, businessId) as { name: string; available: number } | undefined;
     if (!item || item.available !== 1) {
       throw new OrderError("Something in the cart is no longer available. Refresh the menu.");
     }
     priced.push({
       name: item.name,
       quantity: line.quantity,
-      unitPriceCents: item.priceCents,
+      unitPriceCents: 0,
       note: cleanLineNote(line.note),
     });
   }
+  const unitPriceCents = checkoutUnitCents(priced.reduce((sum, line) => sum + line.quantity, 0));
+  for (const line of priced) line.unitPriceCents = unitPriceCents;
   return {
     priced,
     totalCents: priced.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0),

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { checkoutUnitCents } from "@/lib/checkout-price";
 import type { DeliveryChoice } from "@/lib/delivery-dates";
 import { formatMoney, formatWhen } from "@/lib/format";
 import type { PublicReview } from "@/lib/reviews";
@@ -229,7 +230,8 @@ export function PublicSite({
     );
 
   const count = lines.reduce((sum, line) => sum + line.quantity, 0);
-  const total = lines.reduce((sum, line) => sum + line.item.priceCents * line.quantity, 0);
+  const unitCents = checkoutUnitCents(count);
+  const total = count * unitCents;
 
   useEffect(() => {
     if (!stripePublishableKey) return;
@@ -822,6 +824,9 @@ export function PublicSite({
                     ? "Pay with Zelle. The kitchen confirms the transfer before the order is paid. Delivery is Monday or Thursday."
                     : "Checkout is waiting on Stripe. Add the publishable key, secret key, and webhook secret under Business in the staff terminal. A payment is not taken until then. Delivery is Monday or Thursday."}
               </p>
+              <p className="mt-4 text-sm leading-6 text-[#5d7568]">
+                Each meal is $15. An order of 5 or more meals is $12 each.
+              </p>
               <div className="mt-6 grid gap-3">
                 {lines.length === 0 ? (
                   <p className="text-sm text-[#5d7568]">Add a meal from the menu to start an order.</p>
@@ -831,7 +836,7 @@ export function PublicSite({
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p>{line.item.name}</p>
-                          <p className="text-[#5d7568]">{formatMoney(line.item.priceCents)} each</p>
+                          <p className="text-[#5d7568]">{formatMoney(unitCents)} each</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
@@ -852,7 +857,7 @@ export function PublicSite({
                             +
                           </button>
                           <span className="w-16 text-right">
-                            {formatMoney(line.item.priceCents * line.quantity)}
+                            {formatMoney(unitCents * line.quantity)}
                           </span>
                         </div>
                       </div>
