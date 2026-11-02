@@ -628,7 +628,7 @@ export function PublicSite({
             {weekLine ? (
               <p className="mt-2 font-serif text-2xl tracking-tight text-[#496252] sm:text-3xl">{weekLine}</p>
             ) : null}
-            <CoralUnderline />
+            <CoralUnderline className="coral-date-sway" />
             <p className="mx-auto mt-5 max-w-md text-sm leading-6 text-[#5d7568]">
               Portioned meals for the week. Order here for delivery.
             </p>

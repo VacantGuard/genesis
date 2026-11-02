@@ -6,11 +6,11 @@ export const publicField =
 export const publicButton =
   "h-10 rounded-full bg-[#fc968a] px-5 text-white hover:bg-[#f07d70]";
 
-export function CoralUnderline() {
+export function CoralUnderline({ className = "" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 320 18"
-      className="mx-auto mt-2 block h-4 w-56 text-[#f9a89e]"
+      className={`mx-auto mt-2 block h-4 w-56 text-[#f9a89e] ${className}`}
       fill="none"
       aria-hidden="true"
     >

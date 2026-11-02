@@ -130,3 +130,24 @@
     @apply font-sans;
   }
 }
+
+@keyframes coral-date-sway {
+  0%,
+  100% {
+    transform: rotate(-1.5deg);
+  }
+  50% {
+    transform: rotate(1.5deg);
+  }
+}
+
+.coral-date-sway {
+  transform-origin: center;
+  animation: coral-date-sway 8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coral-date-sway {
+    animation: none;
+  }
+}
