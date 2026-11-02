@@ -2,8 +2,10 @@ import { postAgentWebhook } from "./agent.ts";
 import { getBusiness } from "./businesses.ts";
 import { formatDeliveryDate } from "./delivery-dates.ts";
 import { formatMoney } from "./format.ts";
+import { sendOrderReceipt } from "./order-receipt.ts";
 import { placeOrder } from "./orders.ts";
 import { postBusinessSlack } from "./slack-post.ts";
+import { zelleAccount } from "./zelle.ts";
 import type { NewOrderInput } from "./db.ts";
 
 type AlertItem = { name: string; quantity: number; note: string };
@@ -88,9 +90,42 @@ async function notifyNewOrder(
   if (posted.delivery === "failed") console.error("Order Slack alert failed", posted.detail);
 }
 
+function receiptFor(
+  businessId: number,
+  input: NewOrderInput,
+  order: {
+    orderNumber: string;
+    customerName: string;
+    items: { name: string; quantity: number; unitPriceCents: number; note?: string }[];
+    totalCents: number;
+    deliveryDate?: string;
+    deliveryAddress: string;
+  },
+  payment: "paid" | "zelle",
+) {
+  const business = getBusiness(businessId);
+  return sendOrderReceipt({
+    businessName: business?.name || "TigEats",
+    to: input.email,
+    orderNumber: order.orderNumber,
+    customerName: order.customerName,
+    phone: input.phone,
+    companyName: input.companyName,
+    notes: input.notes,
+    items: order.items,
+    totalCents: order.totalCents,
+    deliveryDate: order.deliveryDate,
+    deliveryAddress: order.deliveryAddress,
+    payment,
+    cardLast4: input.cardLast4,
+    zelle: payment === "zelle" ? zelleAccount(businessId) : null,
+  });
+}
+
 /** Records a paid order and posts one Slack alert. A repeat for the same Stripe payment does not post again. */
 export async function recordPaidOrder(businessId: number, input: NewOrderInput) {
   const order = placeOrder(businessId, input);
+  let receiptSent = false;
   if (order.created) {
     try {
       await notifyNewOrder(businessId, {
@@ -106,13 +141,15 @@ export async function recordPaidOrder(businessId: number, input: NewOrderInput) 
     } catch (error) {
       console.error(error);
     }
+    receiptSent = await receiptFor(businessId, input, order, "paid");
   }
-  return order;
+  return { ...order, receiptSent };
 }
 
 /** Records a Zelle order that is not paid until staff confirm the transfer. */
 export async function recordZelleOrder(businessId: number, input: NewOrderInput) {
   const order = placeOrder(businessId, { ...input, orderStatus: "zelle", cardLast4: "Zelle" });
+  let receiptSent = false;
   if (order.created) {
     try {
       await notifyNewOrder(businessId, {
@@ -129,6 +166,7 @@ export async function recordZelleOrder(businessId: number, input: NewOrderInput)
     } catch (error) {
       console.error(error);
     }
+    receiptSent = await receiptFor(businessId, input, order, "zelle");
   }
-  return order;
+  return { ...order, receiptSent };
 }

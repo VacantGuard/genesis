@@ -183,8 +183,9 @@ async function smtpSend(settings: SmtpSettings, message: MailMessage) {
   }
 }
 
-export async function sendAccountEmail(
+export async function sendMail(
   message: MailMessage,
+  options?: { logName?: string },
 ): Promise<{ ok: true; mode: "sent" | "logged" } | { ok: false; error: string }> {
   if (/[\r\n]/.test(message.to) || /[\r\n]/.test(message.subject) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(message.to)) {
     return { ok: false, error: "That email address cannot be used." };
@@ -196,14 +197,27 @@ export async function sendAccountEmail(
       return { ok: true, mode: "sent" };
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Email failed.";
-      return { ok: false, error: `The reset email could not be sent. ${detail}` };
+      return { ok: false, error: detail };
     }
   }
   if (process.env.VERCEL) {
-    return { ok: false, error: "Reset email is not set up, so no link was sent." };
+    return { ok: false, error: "Email is not set up, so nothing was sent." };
   }
   const dir = path.join(process.cwd(), "data");
   mkdirSync(dir, { recursive: true });
-  writeFileSync(path.join(dir, "last-password-reset.txt"), `To: ${message.to}\nSubject: ${message.subject}\n\n${message.text}\n`, "utf8");
+  const file = options?.logName?.replace(/[^\w.-]/g, "") || "last-mail.txt";
+  writeFileSync(path.join(dir, file), `To: ${message.to}\nSubject: ${message.subject}\n\n${message.text}\n`, "utf8");
   return { ok: true, mode: "logged" };
+}
+
+export async function sendAccountEmail(
+  message: MailMessage,
+): Promise<{ ok: true; mode: "sent" | "logged" } | { ok: false; error: string }> {
+  const sent = await sendMail(message, { logName: "last-password-reset.txt" });
+  if (sent.ok) return sent;
+  if (sent.error === "That email address cannot be used.") return sent;
+  if (sent.error === "Email is not set up, so nothing was sent.") {
+    return { ok: false, error: "Reset email is not set up, so no link was sent." };
+  }
+  return { ok: false, error: `The reset email could not be sent. ${sent.error}` };
 }

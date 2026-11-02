@@ -25,6 +25,7 @@ type Confirmation = {
   payment?: string;
   zelleName?: string;
   zelleHandle?: string;
+  receiptSent?: boolean;
   requiresAction?: boolean;
   clientSecret?: string;
   paymentIntentId?: string;
@@ -886,6 +887,9 @@ export function PublicSite({
                     : `${confirmation.customerName}, your meal order is paid${deliverySentence(confirmation)}. ${confirmation.wallet === "apple_pay" ? "Paid with Apple Pay." : confirmation.wallet === "google_pay" ? "Paid with Google Pay." : `Card ending ${confirmation.last4} was charged through Stripe.`}`}
                   {smsOptIn
                     ? ` You are enrolled in ${profile.name} menu texts. A confirmation text welcomes you to the program. Reply STOP to opt out or HELP for help.`
+                    : ""}
+                  {confirmation.receiptSent && email
+                    ? ` A receipt was sent to ${email}.`
                     : ""}
                 </p>
                 {confirmation.deliveryLocateUrl ? (

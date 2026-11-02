@@ -138,6 +138,7 @@ export async function POST(request: Request) {
         payment: "zelle",
         zelleName: zelle.name,
         zelleHandle: zelle.handle,
+        receiptSent: saved.receiptSent,
       });
     } catch (error) {
       if (error instanceof OrderError) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -233,6 +234,7 @@ export async function POST(request: Request) {
       items: saved.items,
       last4: cardLast4,
       wallet,
+      receiptSent: saved.receiptSent,
     });
   } catch (error) {
     if (error instanceof OrderError) {

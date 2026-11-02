@@ -48,3 +48,4 @@ next-env.d.ts
 /data/*.db
 /data/*.db-*
 /data/last-password-reset.txt
+/data/last-order-receipt.txt
