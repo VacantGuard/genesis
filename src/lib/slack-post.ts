@@ -4,6 +4,7 @@ export type SlackRouting = {
   hasBotToken: boolean;
   ordersChannel: string;
   textsChannel: string;
+  menuChannel: string;
 };
 
 export type SlackPostResult = {
@@ -29,16 +30,22 @@ function ensureSlackRoutingColumns() {
   if (!names.has("slack_texts_channel")) {
     db.exec("ALTER TABLE businesses ADD COLUMN slack_texts_channel TEXT NOT NULL DEFAULT ''");
   }
+  if (!names.has("slack_menu_channel")) {
+    db.exec("ALTER TABLE businesses ADD COLUMN slack_menu_channel TEXT NOT NULL DEFAULT ''");
+  }
 }
 
 function routingRow(businessId: number) {
   ensureSlackRoutingColumns();
   return getDb()
     .prepare(
-      `SELECT slack_bot_token AS token, slack_orders_channel AS ordersChannel, slack_texts_channel AS textsChannel
+      `SELECT slack_bot_token AS token, slack_orders_channel AS ordersChannel,
+              slack_texts_channel AS textsChannel, slack_menu_channel AS menuChannel
        FROM businesses WHERE id = ?`,
     )
-    .get(businessId) as { token: string; ordersChannel: string; textsChannel: string } | undefined;
+    .get(businessId) as
+    | { token: string; ordersChannel: string; textsChannel: string; menuChannel: string }
+    | undefined;
 }
 
 export function cleanSlackChannel(value: string) {
@@ -59,21 +66,25 @@ export function slackRouting(businessId: number): SlackRouting {
     hasBotToken: Boolean(row?.token),
     ordersChannel: row?.ordersChannel ?? "",
     textsChannel: row?.textsChannel ?? "",
+    menuChannel: row?.menuChannel ?? "",
   };
 }
 
 export function saveSlackRouting(
   businessId: number,
-  input: { botToken: string; ordersChannel: string; textsChannel: string },
+  input: { botToken: string; ordersChannel: string; textsChannel: string; menuChannel: string },
 ) {
   const current = routingRow(businessId);
   if (!current) throw new Error("That business is not on this desk.");
   const ordersChannel = cleanSlackChannel(input.ordersChannel);
   const textsChannel = cleanSlackChannel(input.textsChannel);
+  const menuChannel = cleanSlackChannel(input.menuChannel);
   const ordersError = slackChannelError(ordersChannel);
   const textsError = slackChannelError(textsChannel);
+  const menuError = slackChannelError(menuChannel);
   if (ordersError) throw new Error(ordersError);
   if (textsError) throw new Error(textsError);
+  if (menuError) throw new Error(menuError);
   const typedToken = input.botToken.trim();
   if (typedToken && !typedToken.startsWith("xoxb-")) {
     throw new Error("The Slack bot token starts with xoxb-.");
@@ -82,24 +93,62 @@ export function saveSlackRouting(
   if (textsChannel && !ordersChannel) {
     throw new Error("Name the Slack channel for new orders, such as new-orders.");
   }
-  if ((ordersChannel || textsChannel) && !token) {
+  if ((ordersChannel || textsChannel || menuChannel) && !token) {
     throw new Error("Paste the Slack bot token. It starts with xoxb-.");
   }
   getDb()
     .prepare(
       `UPDATE businesses
-       SET slack_bot_token = ?, slack_orders_channel = ?, slack_texts_channel = ?, updated_at = ?
+       SET slack_bot_token = ?, slack_orders_channel = ?, slack_texts_channel = ?, slack_menu_channel = ?, updated_at = ?
        WHERE id = ?`,
     )
-    .run(token, ordersChannel, textsChannel, new Date().toISOString(), businessId);
+    .run(token, ordersChannel, textsChannel, menuChannel, new Date().toISOString(), businessId);
 }
 
-export function slackDestination(businessId: number, kind: "orders" | "texts") {
+export function slackDestination(businessId: number, kind: "orders" | "texts" | "menu") {
   const row = routingRow(businessId);
   if (!row?.token) return null;
-  const channel = kind === "orders" ? row.ordersChannel : row.textsChannel || row.ordersChannel;
+  const channel =
+    kind === "orders" ? row.ordersChannel : kind === "menu" ? row.menuChannel : row.textsChannel || row.ordersChannel;
   if (!channel) return null;
   return { token: row.token, channel };
+}
+
+export async function ensureBotInChannel(token: string, channel: string) {
+  if (!channel || CHANNEL_ID.test(channel)) return "";
+  try {
+    const url = new URL("https://slack.com/api/conversations.list");
+    url.searchParams.set("types", "public_channel");
+    url.searchParams.set("exclude_archived", "true");
+    url.searchParams.set("limit", "200");
+    const response = await fetch(url, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    const body = (await response.json()) as {
+      ok?: boolean;
+      error?: string;
+      channels?: { id?: string; name?: string; is_member?: boolean }[];
+    };
+    if (!body.ok) return "";
+    const match = body.channels?.find((item) => item.name === channel);
+    if (!match?.id) return `Slack could not find #${channel}.`;
+    if (match.is_member) return "";
+    const join = await fetch("https://slack.com/api/conversations.join", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({ channel: match.id }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const joined = (await join.json()) as { ok?: boolean; error?: string };
+    if (joined.ok || joined.error === "already_in_channel") return "";
+    return `Invite the bot to #${channel} in Slack, then a menu update will post there.`;
+  } catch {
+    return "";
+  }
 }
 
 export async function postSlackMessage(token: string, channel: string, text: string): Promise<SlackPostResult> {
@@ -125,7 +174,7 @@ export async function postSlackMessage(token: string, channel: string, text: str
   }
 }
 
-export async function postBusinessSlack(businessId: number, kind: "orders" | "texts", text: string) {
+export async function postBusinessSlack(businessId: number, kind: "orders" | "texts" | "menu", text: string) {
   const destination = slackDestination(businessId, kind);
   if (!destination) {
     return { configured: false, ok: false, detail: "Slack channel is not saved." };

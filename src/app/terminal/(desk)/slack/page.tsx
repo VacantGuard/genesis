@@ -21,7 +21,7 @@ export default async function SlackPage({
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
           Connect the Slack workspace where staff talk to the menu agent for {business.name}. New
           orders post in the orders channel. Incoming texts post in the text channel, or in the orders
-          channel when that field is left blank. Menu updates still go through the agent webhook.
+          channel when that field is left blank. Menu updates post in their own channel.
         </p>
       </div>
       <Flash error={query.error} saved={query.saved} />
@@ -69,6 +69,15 @@ export default async function SlackPage({
             name="textsChannel"
             defaultValue={routing.textsChannel}
             placeholder="Leave blank to use the new orders channel"
+            className="h-10 bg-card"
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm">
+          <span className="font-medium">Menu updates channel</span>
+          <Input
+            name="menuChannel"
+            defaultValue={routing.menuChannel}
+            placeholder="menu-change"
             className="h-10 bg-card"
           />
         </label>

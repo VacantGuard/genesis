@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { menuLink, type BusinessRecord } from "./businesses.ts";
 import { getDb } from "./db.ts";
+import { postBusinessSlack } from "./slack-post.ts";
 import { listCompanies, listCustomers } from "./directory.ts";
 
 export type MenuClient = {
@@ -287,5 +288,6 @@ export async function publishMenuUpdate(input: { business: BusinessRecord; summa
   getDb()
     .prepare("UPDATE menu_triggers SET delivery = ?, detail = ? WHERE id = ?")
     .run(posted.delivery, posted.detail, triggerId);
-  return { triggerId, delivery: posted.delivery, detail: posted.detail, clientCount: clients.length, menuUrl };
+  const slack = await postBusinessSlack(input.business.id, "menu", `Menu update: ${input.summary}\n${menuUrl}`);
+  return { triggerId, delivery: posted.delivery, detail: posted.detail, clientCount: clients.length, menuUrl, slack };
 }

@@ -5,7 +5,14 @@ import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
 import { saveAgentWebhook } from "@/lib/agent";
 import { saveTextSettings } from "@/lib/messaging";
-import { saveSlackRouting, slackRouting } from "@/lib/slack-post";
+import {
+  cleanSlackChannel,
+  ensureBotInChannel,
+  postSlackMessage,
+  saveSlackRouting,
+  slackDestination,
+  slackRouting,
+} from "@/lib/slack-post";
 import { pointTwilioAtInbound } from "@/lib/twilio-inbound";
 import { setPublicOrigin, setSlackConnection } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
@@ -146,10 +153,28 @@ export async function saveSlackAction(formData: FormData) {
   }
   try {
     setSlackConnection(business.id, teamId || null, teamId ? teamName : "");
+    const before = slackRouting(business.id);
+    const menuChannel = cleanSlackChannel(field(formData, "menuChannel"));
+    if (menuChannel && menuChannel !== before.menuChannel) {
+      const token =
+        field(formData, "botToken").trim() ||
+        slackDestination(business.id, "orders")?.token ||
+        slackDestination(business.id, "texts")?.token ||
+        "";
+      if (!token) throw new Error("Paste the Slack bot token. It starts with xoxb-.");
+      await ensureBotInChannel(token, menuChannel);
+      const posted = await postSlackMessage(
+        token,
+        menuChannel,
+        "Menu updates will post in this channel. New orders stay in their own channel.",
+      );
+      if (!posted.ok) throw new Error(posted.detail);
+    }
     saveSlackRouting(business.id, {
       botToken: field(formData, "botToken"),
       ordersChannel: field(formData, "ordersChannel"),
       textsChannel: field(formData, "textsChannel"),
+      menuChannel: field(formData, "menuChannel"),
     });
   } catch (error) {
     bounce("/terminal/slack", error instanceof Error ? error.message : "Could not save the Slack workspace.");
@@ -167,8 +192,9 @@ export async function saveSlackAction(formData: FormData) {
     : routing.ordersChannel
       ? " Incoming texts post in that same channel."
       : "";
+  const menu = routing.menuChannel ? ` Menu updates post in #${routing.menuChannel}.` : "";
   const message = teamId
-    ? `Slack workspace ${teamId} is connected to ${business.name}.${orders}${texts}${inbound}`
-    : `Slack is disconnected from ${business.name}.${orders}${texts}${inbound}`;
+    ? `Slack workspace ${teamId} is connected to ${business.name}.${orders}${texts}${menu}${inbound}`
+    : `Slack is disconnected from ${business.name}.${orders}${texts}${menu}${inbound}`;
   redirect(`/terminal/slack?saved=${encodeURIComponent(message)}`);
 }

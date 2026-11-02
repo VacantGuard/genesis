@@ -58,7 +58,12 @@ async function tellAgent(business: BusinessRecord, summary: string, staffMessage
   const note = result.delivery === "sent"
     ? ` Slack can send ${result.menuUrl} to ${result.clientCount} clients.`
     : " Add the n8n webhook on the Agent page so Slack can send clients the link.";
-  await saved("/terminal/menu", `${staffMessage}${note}`);
+  const posted = result.slack.configured
+    ? result.slack.ok
+      ? " The menu update was posted in the menu Slack channel."
+      : ` ${result.slack.detail}`
+    : "";
+  await saved("/terminal/menu", `${staffMessage}${note}${posted}`);
 }
 
 async function saved(path: string, message: string): Promise<never> {
