@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { requireSession } from "@/lib/auth";
 import { saveAgentWebhook } from "@/lib/agent";
 import { saveTextSettings } from "@/lib/messaging";
@@ -141,6 +141,7 @@ export async function saveWeeklyMenuTextAction(formData: FormData) {
 }
 
 export async function saveSlackAction(formData: FormData) {
+  try {
   const business = await currentBusiness();
   await requireSession();
   const teamId = field(formData, "teamId").toUpperCase();
@@ -177,6 +178,7 @@ export async function saveSlackAction(formData: FormData) {
       menuChannel: field(formData, "menuChannel"),
     });
   } catch (error) {
+    unstable_rethrow(error);
     bounce("/terminal/slack", error instanceof Error ? error.message : "Could not save the Slack workspace.");
   }
   revalidatePath("/terminal/slack");
@@ -197,4 +199,8 @@ export async function saveSlackAction(formData: FormData) {
     ? `Slack workspace ${teamId} is connected to ${business.name}.${orders}${texts}${menu}${inbound}`
     : `Slack is disconnected from ${business.name}.${orders}${texts}${menu}${inbound}`;
   redirect(`/terminal/slack?saved=${encodeURIComponent(message)}`);
+  } catch (error) {
+    unstable_rethrow(error);
+    bounce("/terminal/slack", error instanceof Error ? error.message : "Could not save the Slack workspace.");
+  }
 }
