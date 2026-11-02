@@ -28,6 +28,7 @@ import {
   setMenuItemAvailability,
   updateMenuItem,
 } from "@/lib/menu";
+import { addDriver, removeDriver, saveRouteStart } from "@/lib/driver-route";
 import { markZelleReceived } from "@/lib/orders";
 import { findTextPhoto, sniffPhoto, TEXT_PHOTO_MAX_BYTES, textPhotoPublicUrl } from "@/lib/text-media";
 import { sendCampaign } from "@/lib/texts";
@@ -201,6 +202,33 @@ export async function updateMenuItemAction(formData: FormData) {
   if (!updated) bounce("/terminal/menu", "That meal is not on this business.");
   storeMealPhoto(business.id, id, photo);
   await tellAgent(business, `${item.name} was updated on the weekly menu.`, `${item.name} was updated on the public menu.`);
+}
+
+export async function addDriverAction(formData: FormData) {
+  const business = await deskBusiness();
+  try {
+    addDriver(business.id, { name: field(formData, "name"), phone: field(formData, "phone") });
+  } catch (error) {
+    unstable_rethrow(error);
+    bounce("/terminal/orders", error instanceof Error ? error.message : "That driver could not be saved.");
+  }
+  await saved("/terminal/orders", "Driver saved. The agent can text this number a delivery route.");
+}
+
+export async function removeDriverAction(formData: FormData) {
+  const business = await deskBusiness();
+  const id = optionalId(field(formData, "id"));
+  if (!id || !removeDriver(business.id, id)) bounce("/terminal/orders", "That driver could not be removed.");
+  await saved("/terminal/orders", "Driver removed.");
+}
+
+export async function saveRouteStartAction(formData: FormData) {
+  const business = await deskBusiness();
+  const start = saveRouteStart(business.id, field(formData, "start"));
+  await saved(
+    "/terminal/orders",
+    start ? "Route start saved. Driver maps begin there." : "Route start cleared. Driver maps begin at the driver's location.",
+  );
 }
 
 export async function markZelleReceivedAction(formData: FormData) {

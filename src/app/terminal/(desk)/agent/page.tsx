@@ -110,6 +110,12 @@ export default async function AgentPage({
           for this business is saved on the Slack page and is included on each trigger.
         </p>
         <p className="text-muted-foreground">
+          A driver route is POST /api/agent/route with the same Bearer token. The body is{" "}
+          {`{"date":"2026-11-05"}`}. Leave date blank for the next delivery that has orders. Add a
+          phones list only when staff name a number, as in{" "}
+          {`{"date":"2026-11-05","phones":["3125550100"]}`}. The text goes to drivers, not customers.
+        </p>
+        <p className="text-muted-foreground">
           A weekly menu text is POST /api/agent/schedule with the same Bearer token. The body is{" "}
           {`{"weekday":"monday","time":"9:00am","timezone":"America/Chicago","message":"This week's menu is ready."}`}
           . Blank fields keep the current day, time, or wording. The desk sends it once, at that
@@ -139,9 +145,13 @@ There is no duplicate-text block. If staff ask to send again, or say override, c
 
 When staff ask for a recurring menu text, or to change the day or time of that text, call the weekly menu schedule tool. Put the day in weekday, such as monday. Put the clock time in time, such as 9:00am. Use America/Chicago for timezone unless they name another. Put their wording in message when they give it. Leave enabled empty. The word off turns it off only when they say to turn it off. Then repeat the summary word for word, including the reason, and stop. Do not say you cannot create a recurring schedule. Do not send the text tool for a schedule change.
 
+When staff ask for the delivery route, driver addresses, or to text the route to drivers, call the delivery route tool. Put the delivery date in date as YYYY-MM-DD when they name a day. Leave date blank for the next date that has orders. Put phones only when they name driver numbers. Leave phones empty to text the drivers saved on Orders. Repeat the message word for word, including each stop and the route link. If sent is false, repeat the detail and still read the stops. Do not invent addresses. Do not use the customer text tool for a driver route.
+
 If a tool returns an error, repeat that error and stop.`}</pre>
         <p className="text-muted-foreground">Tool description for the read-only menu HTTP tool:</p>
         <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-6">{`Read TigEats weekly menu, client numbers, who has paid, and when the weekly menu text is scheduled. The page starts by listing what it answers. The weekly menu text section includes a reason. Quote that section for schedule questions. Each client line starts with a client number such as C-1001. A paid line also has an order number. A not-paid line does not. Call this before answering about the menu, clients, payments, or the weekly text schedule.`}</pre>
+        <p className="text-muted-foreground">Tool description for the delivery route HTTP tool:</p>
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-6">{`Text delivery drivers the address route for one delivery date. POST /api/agent/route with the Bearer token. date is YYYY-MM-DD, or blank for the next date that has orders. phones is optional. Leave phones empty to text the drivers saved on Orders. The response message lists each stop and a Google Maps route link. Repeat that message. This does not text customers.`}</pre>
         <p className="text-muted-foreground">Tool description for the weekly menu schedule HTTP tool:</p>
         <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border bg-card p-4 text-sm leading-6">{`Set the TigEats weekly menu text. Call this when staff ask to send the menu on a schedule or to change that day or time. weekday is a day name such as monday. time is a clock time such as 9:00am. timezone is America/Chicago unless they name another. message is the wording. Leave a field blank to keep its current value. Leave enabled blank. Send off only when staff say to turn the weekly text off. The response always has a reason and a summary. Repeat the summary word for word. This does not send the text immediately.`}</pre>
       </section>
