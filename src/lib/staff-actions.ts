@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { requireSession, setSessionCookie } from "@/lib/auth";
-import { claimStaffInvite, createStaffInvite } from "@/lib/staff-access";
+import { getDb } from "@/lib/db";
+import { claimStaffInvite, createStaffInvite, listStaffAccounts } from "@/lib/staff-access";
 import { clearCampaignHistory } from "@/lib/texts";
 
 function field(formData: FormData, key: string) {
@@ -15,6 +16,38 @@ export async function createStaffInviteAction() {
   await requireSession();
   const invite = createStaffInvite();
   redirect(`/terminal/access?invite=${encodeURIComponent(invite.token)}`);
+}
+
+export async function clearLaunchPracticeAction() {
+  await requireSession();
+  listStaffAccounts();
+  const db = getDb();
+  const orders = (db.prepare("SELECT COUNT(*) AS n FROM orders").get() as { n: number }).n;
+  const campaigns = (db.prepare("SELECT COUNT(*) AS n FROM campaigns").get() as { n: number }).n;
+  const staff = (db.prepare("SELECT username FROM staff_accounts").all() as { username: string }[]).map(
+    (row) => row.username,
+  );
+  const clear = db.transaction(() => {
+    db.exec("DELETE FROM order_items");
+    db.exec("DELETE FROM orders");
+    db.exec("DELETE FROM sms_log");
+    db.exec("DELETE FROM campaigns");
+    const inbound = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'inbound_texts'")
+      .get();
+    if (inbound) db.exec("DELETE FROM inbound_texts");
+    db.prepare("DELETE FROM staff_accounts WHERE lower(username) = 'teeflex'").run();
+    db.prepare("DELETE FROM staff_invites WHERE lower(username) = 'teeflex'").run();
+  });
+  clear();
+  const left = (db.prepare("SELECT username FROM staff_accounts").all() as { username: string }[])
+    .map((row) => row.username)
+    .join(", ");
+  redirect(
+    `/terminal/access?saved=${encodeURIComponent(
+      `Cleared ${orders} orders and ${campaigns} text campaigns. Removed teeflex. Staff now: ${left || "none"}. Was: ${staff.join(", ") || "none"}.`,
+    )}`,
+  );
 }
 
 export async function clearCampaignHistoryAction() {

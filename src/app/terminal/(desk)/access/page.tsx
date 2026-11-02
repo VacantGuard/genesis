@@ -1,6 +1,11 @@
 import { Flash } from "@/components/flash";
 import { Button } from "@/components/ui/button";
-import { clearCampaignHistoryAction, createStaffInviteAction, staffOrigin } from "@/lib/staff-actions";
+import {
+  clearCampaignHistoryAction,
+  clearLaunchPracticeAction,
+  createStaffInviteAction,
+  staffOrigin,
+} from "@/lib/staff-actions";
 import { listOpenInvites, listStaffAccounts } from "@/lib/staff-access";
 
 export default async function AccessPage({
@@ -31,6 +36,9 @@ export default async function AccessPage({
       {fresh ? (
         <p className="max-w-2xl break-all rounded-xl border bg-card p-4 text-sm">{fresh}</p>
       ) : null}
+      <form action={clearLaunchPracticeAction} hidden>
+        <Button type="submit">Clear launch practice</Button>
+      </form>
       <form action={createStaffInviteAction}>
         <Button type="submit">Create an invite link</Button>
       </form>
