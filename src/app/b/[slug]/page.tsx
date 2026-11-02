@@ -6,7 +6,7 @@ import { getBusinessBySlug, getMenuWeekNote } from "@/lib/businesses";
 import { getPublicMenu } from "@/lib/menu";
 import { listReviews } from "@/lib/reviews";
 import { deliveryChoices } from "@/lib/delivery-dates";
-import { deskIsOpen } from "@/lib/go-live";
+import { visitorSeesMenu } from "@/lib/go-live";
 import { stripePublishableKey } from "@/lib/stripe";
 import { zelleAccount } from "@/lib/zelle";
 
@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function BusinessMenuPage({ params }: { params: Promise<{ slug: string }> }) {
-  if (!deskIsOpen()) return <LaunchAnticipation />;
+  if (!(await visitorSeesMenu())) return <LaunchAnticipation />;
   const { slug } = await params;
   const business = getBusinessBySlug(slug);
   if (!business) notFound();

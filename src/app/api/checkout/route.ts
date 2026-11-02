@@ -4,7 +4,7 @@ import { OrderError } from "@/lib/db";
 import { readDeliveryAddress, validateDeliveryAddress } from "@/lib/delivery";
 import { deliveryDateError } from "@/lib/delivery-dates";
 import { cleanLineNote, priceOrderLines } from "@/lib/orders";
-import { deskIsOpen, GO_LIVE_MESSAGE } from "@/lib/go-live";
+import { GO_LIVE_MESSAGE, visitorSeesMenu } from "@/lib/go-live";
 import { ensureApplePayDomains, openCheckout } from "@/lib/stripe";
 
 export const runtime = "nodejs";
@@ -35,7 +35,7 @@ function clean(value: unknown, max: number) {
 }
 
 export async function POST(request: Request) {
-  if (!deskIsOpen()) return NextResponse.json({ error: GO_LIVE_MESSAGE }, { status: 403 });
+  if (!(await visitorSeesMenu())) return NextResponse.json({ error: GO_LIVE_MESSAGE }, { status: 403 });
   let body: Body;
   try {
     body = (await request.json()) as Body;

@@ -1,3 +1,5 @@
+import { ADMIN_USERNAME, getSession } from "./auth";
+
 const TIMEZONE = "America/Chicago";
 const GO_LIVE_DATE = "2026-11-03";
 const GO_LIVE_MINUTES = 11 * 60;
@@ -29,4 +31,11 @@ export function deskIsOpen(now = new Date()) {
   if (stamp.date > GO_LIVE_DATE) return true;
   if (stamp.date < GO_LIVE_DATE) return false;
   return stamp.minutes >= GO_LIVE_MINUTES;
+}
+
+/** The one-time hold stays up for everyone except the signed-in kitchen admin. */
+export async function visitorSeesMenu() {
+  if (deskIsOpen()) return true;
+  const session = await getSession();
+  return session?.username === ADMIN_USERNAME;
 }
