@@ -45,7 +45,7 @@ export async function claimStaffInviteAction(formData: FormData) {
     const message = error instanceof Error ? error.message : "That account could not be created.";
     redirect(`${back}?error=${encodeURIComponent(message)}`);
   }
-  redirect("/terminal");
+  redirect("/terminal?welcome=1");
 }
 
 export async function staffOrigin() {

@@ -1,12 +1,16 @@
+import { StaffWelcome } from "@/components/terminal/welcome";
 import { currentBusiness } from "@/lib/current-business";
-import { tursoConfig } from "@/lib/db";
 import { formatMoney, formatWhen } from "@/lib/format";
 import { getDashboardStats, listOrders } from "@/lib/orders";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default async function TerminalHomePage() {
+export default async function TerminalHomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ welcome?: string }>;
+}) {
+  const query = await searchParams;
   const business = await currentBusiness();
-  const turso = tursoConfig();
   const stats = getDashboardStats(business.id);
   const recent = listOrders(business.id).slice(0, 5);
 
@@ -25,15 +29,13 @@ export default async function TerminalHomePage() {
       <div>
         <h1 className="font-heading text-3xl tracking-tight">Overview</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Edit the weekly prep menu, keep customer and company records, log text campaigns, and
-          export paid orders for the kitchen. This desk does not schedule delivery.
-        </p>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          {turso
-            ? `Customer accounts, orders, and the client list are stored in Turso (${turso.host}).`
-            : "Customer accounts are still in the local database file. Add TURSO_DATABASE_URL and TURSO_AUTH_TOKEN to .env.local, then restart the server."}
+          Update the weekly menu, read orders, and send menu texts. Customers order on the public
+          site and choose Monday or Thursday delivery.
         </p>
       </div>
+      {query.welcome === "1" ? (
+        <StaffWelcome name={business.name} menuHref={`/b/${business.slug}`} />
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {tiles.map((tile) => (
           <Card key={tile.label} size="sm">

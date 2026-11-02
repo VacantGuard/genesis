@@ -20,7 +20,8 @@ export default async function AccessPage({
         <h1 className="font-heading text-3xl tracking-tight">Staff access</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
           Send a link so someone can create their own username and password for this desk. The link
-          works once and expires in 7 days. Your original kitchen login keeps working.
+          welcomes them and walks them through the menu, orders, and texts. It works once and expires
+          in 7 days. Your original kitchen login keeps working.
         </p>
       </div>
       <Flash
