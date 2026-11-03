@@ -291,42 +291,85 @@ function findCustomer(businessId: number, email: string, phone: string) {
   return rows.find((row) => digits(row.phone) === phoneKey) ?? null;
 }
 
-export function registerCustomerAccount(input: { name: string; phone: string; email: string; password: string }) {
+export function registerCustomerAccount(input: {
+  name: string;
+  phone: string;
+  email: string;
+  password: string;
+  delivery?: DeliveryAddress;
+}) {
   ensureAccounts();
   const business = getHomepageBusiness();
-  const name = input.name.trim();
-  const phone = input.phone.trim();
-  const email = input.email.trim().toLowerCase();
+  const name = input.name.trim().replace(/\s+/g, " ").slice(0, 80);
+  const phone = input.phone.trim().replace(/\s+/g, " ").slice(0, 40);
+  const email = input.email.trim().toLowerCase().slice(0, 120);
   const password = input.password;
+  const delivery = readDeliveryAddress(input.delivery ?? {});
   if (name.length < 2) return { ok: false as const, error: "Enter your name." };
   if (digits(phone).length < 7) return { ok: false as const, error: "Enter a phone number." };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false as const, error: "Enter a valid email." };
   if (password.length < 8) return { ok: false as const, error: "Use a password of at least 8 characters." };
 
+  getCustomer(business.id, 0);
   const db = getDb();
   const taken = db
     .prepare(`SELECT id FROM customer_accounts WHERE business_id = ? AND email = ?`)
     .get(business.id, email);
   if (taken) return { ok: false as const, error: "That email already has an account. Sign in." };
 
+  const hasDelivery = Boolean(delivery.line1 || delivery.line2 || delivery.city || delivery.state || delivery.postalCode);
   const accountId = db.transaction(() => {
     const existing = findCustomer(business.id, email, phone);
     let customerId = existing?.id ?? 0;
     if (existing) {
-      db.prepare(`UPDATE customers SET name = ?, phone = ?, email = ? WHERE id = ? AND business_id = ?`).run(
-        name,
-        phone,
-        email,
-        existing.id,
-        business.id,
-      );
+      if (hasDelivery) {
+        db.prepare(
+          `UPDATE customers
+           SET name = ?, phone = ?, email = ?,
+               delivery_line1 = ?, delivery_line2 = ?, delivery_city = ?,
+               delivery_state = ?, delivery_postal_code = ?
+           WHERE id = ? AND business_id = ?`,
+        ).run(
+          name,
+          phone,
+          email,
+          delivery.line1,
+          delivery.line2,
+          delivery.city,
+          delivery.state,
+          delivery.postalCode,
+          existing.id,
+          business.id,
+        );
+      } else {
+        db.prepare(`UPDATE customers SET name = ?, phone = ?, email = ? WHERE id = ? AND business_id = ?`).run(
+          name,
+          phone,
+          email,
+          existing.id,
+          business.id,
+        );
+      }
     } else {
       const inserted = db
         .prepare(
-          `INSERT INTO customers (name, phone, email, company_id, notes, business_id, created_at)
-           VALUES (?, ?, ?, NULL, '', ?, ?)`,
+          `INSERT INTO customers
+            (name, phone, email, company_id, notes, business_id,
+             delivery_line1, delivery_line2, delivery_city, delivery_state, delivery_postal_code, created_at)
+           VALUES (?, ?, ?, NULL, '', ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run(name, phone, email, business.id, new Date().toISOString());
+        .run(
+          name,
+          phone,
+          email,
+          business.id,
+          delivery.line1,
+          delivery.line2,
+          delivery.city,
+          delivery.state,
+          delivery.postalCode,
+          new Date().toISOString(),
+        );
       customerId = Number(inserted.lastInsertRowid);
     }
     const account = db
@@ -344,7 +387,13 @@ export function registerCustomerAccount(input: { name: string; phone: string; em
   return { ok: true as const, accountId };
 }
 
-export async function signUpCustomer(input: { name: string; phone: string; email: string; password: string }) {
+export async function signUpCustomer(input: {
+  name: string;
+  phone: string;
+  email: string;
+  password: string;
+  delivery?: DeliveryAddress;
+}) {
   const result = registerCustomerAccount(input);
   if (!result.ok) return result;
   await writeCookie(result.accountId);

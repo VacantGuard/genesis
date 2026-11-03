@@ -23,6 +23,26 @@ export function AccountAuthForm({ mode }: { mode: "signup" | "login" }) {
             <span className="font-medium">Phone</span>
             <Input name="phone" autoComplete="tel" required className={publicField} />
           </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">Delivery street</span>
+            <Input name="line1" autoComplete="address-line1" className={publicField} />
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">Apt / suite</span>
+            <Input name="line2" autoComplete="address-line2" placeholder="Optional" className={publicField} />
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">City</span>
+            <Input name="city" autoComplete="address-level2" className={publicField} />
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">State</span>
+            <Input name="state" autoComplete="address-level1" className={publicField} />
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="font-medium">ZIP</span>
+            <Input name="postalCode" autoComplete="postal-code" className={publicField} />
+          </label>
         </>
       ) : null}
       <label className="grid gap-1.5 text-sm">

@@ -26,6 +26,13 @@ export async function signUpAction(_state: AccountFormState, formData: FormData)
     phone: String(formData.get("phone") ?? ""),
     email: String(formData.get("email") ?? ""),
     password: String(formData.get("password") ?? ""),
+    delivery: readDeliveryAddress({
+      line1: formData.get("line1"),
+      line2: formData.get("line2"),
+      city: formData.get("city"),
+      state: formData.get("state"),
+      postalCode: formData.get("postalCode"),
+    }),
   });
   if (!result.ok) return { error: result.error };
   redirect("/account");

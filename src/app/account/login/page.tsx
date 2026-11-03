@@ -27,7 +27,7 @@ export default async function CustomerLoginPage() {
         <Link href="/account/reset" className="mt-6 text-sm underline">
           Forgot password
         </Link>
-        <Link href="/account/signup" className="mt-3 text-sm underline">
+        <Link href="/signup" className="mt-3 text-sm underline">
           Create an account
         </Link>
         <Link href="/" className="mt-3 text-sm text-[#5d7568]">
