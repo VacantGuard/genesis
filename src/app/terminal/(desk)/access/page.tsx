@@ -17,6 +17,7 @@ export default async function AccessPage({
   const accounts = listStaffAccounts();
   const invites = listOpenInvites();
   const fresh = query.invite ? `${origin}/terminal/join/${query.invite}` : "";
+  const customerSignup = "https://www.tigeats.com/signup";
 
   return (
     <>
@@ -28,6 +29,14 @@ export default async function AccessPage({
           in 7 days. Your original kitchen login keeps working.
         </p>
       </div>
+      <section className="grid max-w-2xl gap-2">
+        <h2 className="font-heading text-2xl tracking-tight">Customer sign-up</h2>
+        <p className="text-sm text-muted-foreground">
+          Send this link so a customer can create their own portal login. Checkout uses the name,
+          phone, email, and delivery address they save.
+        </p>
+        <p className="break-all rounded-xl border bg-card p-4 text-sm">{customerSignup}</p>
+      </section>
       <Flash
         error={query.error}
         saved={query.saved || (fresh ? "Invite link ready. Send this page address." : undefined)}
