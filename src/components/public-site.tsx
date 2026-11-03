@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { checkoutUnitCents } from "@/lib/checkout-price";
 import type { DeliveryChoice } from "@/lib/delivery-dates";
 import { formatMoney, formatWhen } from "@/lib/format";
+import type { CheckoutDetails } from "@/lib/customer-auth";
 import type { PublicReview } from "@/lib/reviews";
 import type { BusinessProfile, PublicCategory, PublicMenuItem } from "@/lib/types";
 import { CoralUnderline, PublicFooter, PublicHeader, publicButton, publicField } from "@/components/public-chrome";
@@ -24,8 +25,6 @@ type Confirmation = {
   last4: string;
   wallet?: string;
   payment?: string;
-  zelleName?: string;
-  zelleHandle?: string;
   receiptSent?: boolean;
   requiresAction?: boolean;
   clientSecret?: string;
@@ -145,8 +144,9 @@ export function PublicSite({
   reviews: initialReviews,
   businessSlug,
   accountName,
+  checkout,
   stripePublishableKey,
-  zelle,
+  canPayWithZelle = false,
   deliveryChoices,
 }: {
   profile: BusinessProfile;
@@ -154,27 +154,28 @@ export function PublicSite({
   reviews: PublicReview[];
   businessSlug: string;
   accountName?: string | null;
+  checkout?: CheckoutDetails | null;
   stripePublishableKey?: string | null;
-  zelle?: { name: string; handle: string } | null;
+  canPayWithZelle?: boolean;
   deliveryChoices: DeliveryChoice[];
 }) {
   const [cart, setCart] = useState<Record<number, number>>({});
-  const [customerName, setCustomerName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [companyName, setCompanyName] = useState("");
-  const [deliveryLine1, setDeliveryLine1] = useState("");
-  const [deliveryLine2, setDeliveryLine2] = useState("");
-  const [deliveryCity, setDeliveryCity] = useState("");
-  const [deliveryState, setDeliveryState] = useState("");
-  const [deliveryPostalCode, setDeliveryPostalCode] = useState("");
+  const [customerName, setCustomerName] = useState(checkout?.name ?? "");
+  const [phone, setPhone] = useState(checkout?.phone ?? "");
+  const [email, setEmail] = useState(checkout?.email ?? "");
+  const [companyName, setCompanyName] = useState(checkout?.companyName ?? "");
+  const [deliveryLine1, setDeliveryLine1] = useState(checkout?.line1 ?? "");
+  const [deliveryLine2, setDeliveryLine2] = useState(checkout?.line2 ?? "");
+  const [deliveryCity, setDeliveryCity] = useState(checkout?.city ?? "");
+  const [deliveryState, setDeliveryState] = useState(checkout?.state ?? "");
+  const [deliveryPostalCode, setDeliveryPostalCode] = useState(checkout?.postalCode ?? "");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [notes, setNotes] = useState("");
   const [lineNotes, setLineNotes] = useState<Record<number, string>>({});
   const [cartReady, setCartReady] = useState(false);
   const [smsOptIn, setSmsOptIn] = useState(false);
   const canCard = Boolean(stripePublishableKey);
-  const canZelle = Boolean(zelle?.handle);
+  const canZelle = canPayWithZelle;
   const [method, setMethod] = useState<"card" | "zelle">(canCard ? "card" : "zelle");
   const [stripeReady, setStripeReady] = useState(false);
   const [paymentReady, setPaymentReady] = useState(false);
@@ -458,7 +459,7 @@ export function PublicSite({
       return;
     }
     if (method === "zelle") {
-      if (!zelle) {
+      if (!canZelle) {
         setError("Zelle is not set up on this menu.");
         return;
       }
@@ -888,7 +889,7 @@ export function PublicSite({
                 <h3 className="mt-2 font-serif text-4xl tracking-tight text-[#496252]">{confirmation.orderNumber}</h3>
                 <p className="mt-3 text-sm leading-6 text-[#5d7568]">
                   {confirmation.payment === "zelle"
-                    ? `${confirmation.customerName}, send ${formatMoney(confirmation.totalCents)} with Zelle to ${confirmation.zelleName} at ${confirmation.zelleHandle}. Put your name in the Zelle note. The kitchen confirms the transfer, then the order is paid${deliverySentence(confirmation)}.`
+                    ? `${confirmation.customerName}, send with Zelle. Put your name in the Zelle note. The kitchen confirms the transfer, then the order is paid${deliverySentence(confirmation)}.`
                     : `${confirmation.customerName}, your meal order is paid${deliverySentence(confirmation)}. ${confirmation.wallet === "apple_pay" ? "Paid with Apple Pay." : confirmation.wallet === "google_pay" ? "Paid with Google Pay." : `Card ending ${confirmation.last4} was charged through Stripe.`}`}
                   {smsOptIn
                     ? ` You are enrolled in ${profile.name} menu texts. A confirmation text welcomes you to the program. Reply STOP to opt out or HELP for help.`
@@ -1075,22 +1076,18 @@ export function PublicSite({
                             checked={method === "zelle"}
                             onChange={() => setMethod("zelle")}
                           />
-                          Zelle
+                          Send with Zelle
                         </label>
                       </div>
                     ) : null}
                     {method === "zelle" ? (
-                      zelle ? (
+                      canZelle ? (
                         <p className="leading-6 text-[#5d7568]">
-                          Send {formatMoney(total)} with Zelle to {zelle.name} at {zelle.handle}. Put your name in the
-                          Zelle note. Place the order here, then send the transfer. The kitchen marks it paid when the
-                          money arrives.
+                          Send with Zelle. Put your name in the Zelle note. Place the order here, then send the
+                          transfer. The kitchen marks it paid when the money arrives.
                         </p>
                       ) : (
-                        <p className="leading-6 text-[#5d7568]">
-                          Zelle is selected. Add the Zelle email or mobile number under Business in the staff desk, then
-                          save it. Customers will see where to send the payment.
-                        </p>
+                        <p className="leading-6 text-[#5d7568]">Zelle is not set up on this menu.</p>
                       )
                     ) : (
                       <>

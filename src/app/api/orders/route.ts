@@ -138,8 +138,6 @@ export async function POST(request: Request) {
         items: saved.items,
         last4: "Zelle",
         payment: "zelle",
-        zelleName: zelle.name,
-        zelleHandle: zelle.handle,
         receiptSent: saved.receiptSent,
       });
     } catch (error) {

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { LaunchAnticipation } from "@/components/launch-anticipation";
 import { PublicSite } from "@/components/public-site";
-import { currentCustomer } from "@/lib/customer-auth";
+import { checkoutDetails, currentCustomer } from "@/lib/customer-auth";
 import { getBusinessBySlug, getMenuWeekNote } from "@/lib/businesses";
 import { getPublicMenu } from "@/lib/menu";
 import { listReviews } from "@/lib/reviews";
@@ -37,8 +37,9 @@ export default async function BusinessMenuPage({ params }: { params: Promise<{ s
       reviews={listReviews(business.id)}
       businessSlug={business.slug}
       accountName={account && account.businessId === business.id ? account.name : null}
+      checkout={checkoutDetails(account, business.id)}
       stripePublishableKey={stripePublishableKey(business.id)}
-      zelle={zelleAccount(business.id)}
+      canPayWithZelle={Boolean(zelleAccount(business.id))}
       deliveryChoices={deliveryChoices()}
     />
   );

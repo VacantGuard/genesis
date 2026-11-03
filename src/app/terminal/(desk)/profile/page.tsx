@@ -53,13 +53,13 @@ export default async function ProfilePage({
       <section className="grid max-w-2xl gap-3 border-t pt-6">
         <h2 className="font-heading text-2xl tracking-tight">Zelle</h2>
         <p className="text-sm text-muted-foreground">
-          Customers who pay with Zelle send the order total to this name and email or mobile number.
-          The order is not marked paid until someone on this desk confirms the transfer. Leave the
-          email or phone blank to hide Zelle on the public menu.
+          The payee name and Zelle email or phone stay on this desk. Public checkout only says Send
+          with Zelle. The order is not marked paid until someone on this desk confirms the transfer.
+          Leave the email or phone blank to hide Zelle on the public menu.
         </p>
         <form action={saveZelleAction} className="grid gap-3">
           <label className="grid gap-1.5 text-sm">
-            <span className="font-medium">Name customers see</span>
+            <span className="font-medium">Payee name</span>
             <Input
               name="name"
               defaultValue={zelle.name}

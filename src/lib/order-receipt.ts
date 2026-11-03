@@ -27,13 +27,7 @@ function oneLine(value: string | undefined) {
 
 function paymentParagraph(input: OrderReceiptInput) {
   if (input.payment === "zelle") {
-    const handle = oneLine(input.zelle?.handle);
-    const name = oneLine(input.zelle?.name);
-    if (handle) {
-      const who = name ? `${name} at ${handle}` : handle;
-      return `Send ${formatMoney(input.totalCents)} with Zelle to ${who}. Put your name in the Zelle note. The kitchen confirms the transfer before this order is paid.`;
-    }
-    return "Pay this order with Zelle. The kitchen confirms the transfer before it is paid.";
+    return "Send with Zelle. Put your name in the Zelle note. The kitchen confirms the transfer before this order is paid.";
   }
   const last4 = oneLine(input.cardLast4);
   if (/^\d{4}$/.test(last4)) return `This order is paid. Card ending ${last4}.`;

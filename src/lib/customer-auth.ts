@@ -2,7 +2,8 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypt
 import { cookies } from "next/headers";
 import { getHomepageBusiness } from "./businesses";
 import { ordersForCustomerRecord, syncOrdersToCustomer } from "./customer-orders";
-import { ensureClientNumbers } from "./directory";
+import { readDeliveryAddress, type DeliveryAddress } from "./delivery";
+import { ensureClientNumbers, getCustomer, listCompanies } from "./directory";
 import { getDb } from "./db";
 
 const COOKIE = "customer_session";
@@ -19,6 +20,18 @@ export type CustomerAccount = {
   email: string;
   name: string;
   phone: string;
+};
+
+export type CheckoutDetails = {
+  name: string;
+  phone: string;
+  email: string;
+  companyName: string;
+  line1: string;
+  line2: string;
+  city: string;
+  state: string;
+  postalCode: string;
 };
 
 export type CustomerOrder = {
@@ -158,6 +171,97 @@ function bypassAccount(): CustomerAccount {
     name: "Guest",
     phone: "",
   };
+}
+
+export function checkoutDetails(
+  account: CustomerAccount | null,
+  businessId: number,
+): CheckoutDetails | null {
+  if (!account || account.customerId <= 0 || account.businessId !== businessId) return null;
+  const customer = getCustomer(account.businessId, account.customerId);
+  return {
+    name: customer?.name || account.name || "",
+    phone: customer?.phone || account.phone || "",
+    email: customer?.email || account.email || "",
+    companyName: customer?.companyName ?? "",
+    line1: customer?.deliveryLine1 ?? "",
+    line2: customer?.deliveryLine2 ?? "",
+    city: customer?.deliveryCity ?? "",
+    state: customer?.deliveryState ?? "",
+    postalCode: customer?.deliveryPostalCode ?? "",
+  };
+}
+
+function companyIdForName(businessId: number, name: string) {
+  if (!name) return null;
+  const existing = listCompanies(businessId).find((company) => company.name.toLowerCase() === name.toLowerCase());
+  if (existing) return existing.id;
+  const inserted = getDb()
+    .prepare(
+      `INSERT INTO companies (name, contact_name, phone, email, notes, business_id, created_at)
+       VALUES (?, '', '', '', '', ?, ?)`,
+    )
+    .run(name, businessId, new Date().toISOString());
+  return Number(inserted.lastInsertRowid);
+}
+
+export function updateCustomerProfile(
+  account: CustomerAccount,
+  input: {
+    name: string;
+    phone: string;
+    email: string;
+    companyName: string;
+    delivery: DeliveryAddress;
+  },
+) {
+  if (account.customerId <= 0) return { ok: false as const, error: "Sign in to save your profile." };
+  const name = input.name.trim().replace(/\s+/g, " ").slice(0, 80);
+  const phone = input.phone.trim().replace(/\s+/g, " ").slice(0, 40);
+  const email = input.email.trim().toLowerCase().slice(0, 120);
+  const companyName = input.companyName.trim().replace(/\s+/g, " ").slice(0, 80);
+  const delivery = readDeliveryAddress(input.delivery);
+  if (name.length < 2) return { ok: false as const, error: "Enter your name." };
+  if (digits(phone).length < 7) return { ok: false as const, error: "Enter a phone number." };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false as const, error: "Enter a valid email." };
+
+  const customer = getCustomer(account.businessId, account.customerId);
+  if (!customer) return { ok: false as const, error: "That profile could not be found." };
+
+  const db = getDb();
+  ensureAccounts();
+  const taken = db
+    .prepare(`SELECT id FROM customer_accounts WHERE business_id = ? AND email = ? AND id != ?`)
+    .get(account.businessId, email, account.id);
+  if (taken) return { ok: false as const, error: "That email already has an account." };
+
+  const companyId = companyIdForName(account.businessId, companyName);
+  db.prepare(
+    `UPDATE customers
+     SET name = ?, phone = ?, email = ?, company_id = ?,
+         delivery_line1 = ?, delivery_line2 = ?, delivery_city = ?,
+         delivery_state = ?, delivery_postal_code = ?
+     WHERE id = ? AND business_id = ?`,
+  ).run(
+    name,
+    phone,
+    email,
+    companyId,
+    delivery.line1,
+    delivery.line2,
+    delivery.city,
+    delivery.state,
+    delivery.postalCode,
+    account.customerId,
+    account.businessId,
+  );
+  db.prepare(`UPDATE customer_accounts SET email = ? WHERE id = ? AND business_id = ?`).run(
+    email,
+    account.id,
+    account.businessId,
+  );
+  syncOrdersToCustomer(account.businessId, account.customerId, phone, email);
+  return { ok: true as const };
 }
 
 export async function currentCustomer(): Promise<CustomerAccount | null> {

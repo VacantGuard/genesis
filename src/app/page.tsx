@@ -1,6 +1,6 @@
 import { LaunchAnticipation } from "@/components/launch-anticipation";
 import { PublicSite } from "@/components/public-site";
-import { currentCustomer } from "@/lib/customer-auth";
+import { checkoutDetails, currentCustomer } from "@/lib/customer-auth";
 import { getHomepageBusiness, getMenuWeekNote } from "@/lib/businesses";
 import { visitorSeesMenu } from "@/lib/go-live";
 import { getPublicMenu } from "@/lib/menu";
@@ -35,8 +35,9 @@ export default async function HomePage() {
       reviews={listReviews(business.id)}
       businessSlug={business.slug}
       accountName={account?.name ?? null}
+      checkout={checkoutDetails(account, business.id)}
       stripePublishableKey={stripePublishableKey(business.id)}
-      zelle={zelleAccount(business.id)}
+      canPayWithZelle={Boolean(zelleAccount(business.id))}
       deliveryChoices={deliveryChoices()}
     />
   );

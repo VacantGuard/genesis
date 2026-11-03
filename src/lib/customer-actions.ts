@@ -2,7 +2,8 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { clearCustomerSession, signInCustomer, signUpCustomer } from "./customer-auth";
+import { clearCustomerSession, currentCustomer, signInCustomer, signUpCustomer, updateCustomerProfile } from "./customer-auth";
+import { readDeliveryAddress } from "./delivery";
 import { requestPasswordReset, resetCustomerPassword } from "./customer-reset";
 import { deskIsOpen, GO_LIVE_MESSAGE } from "./go-live";
 
@@ -38,6 +39,30 @@ export async function signInAction(_state: AccountFormState, formData: FormData)
   });
   if (!result.ok) return { error: result.error };
   redirect("/account");
+}
+
+export async function updateProfileAction(
+  _state: AccountFormState,
+  formData: FormData,
+): Promise<AccountFormState> {
+  if (!deskIsOpen()) return { error: GO_LIVE_MESSAGE };
+  const account = await currentCustomer();
+  if (!account || account.customerId <= 0) return { error: "Sign in to save your profile." };
+  const result = updateCustomerProfile(account, {
+    name: String(formData.get("name") ?? ""),
+    phone: String(formData.get("phone") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    companyName: String(formData.get("companyName") ?? ""),
+    delivery: readDeliveryAddress({
+      line1: formData.get("line1"),
+      line2: formData.get("line2"),
+      city: formData.get("city"),
+      state: formData.get("state"),
+      postalCode: formData.get("postalCode"),
+    }),
+  });
+  if (!result.ok) return { error: result.error };
+  redirect("/account?saved=1");
 }
 
 export async function signOutAction() {
