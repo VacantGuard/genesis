@@ -92,6 +92,7 @@ export function PublicFooter() {
           </Link>
         </span>
       </div>
+      <p className="pb-6 text-center text-xs text-[#5d7568]">Created by Avenix</p>
     </footer>
   );
 }
