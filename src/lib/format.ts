@@ -7,6 +7,7 @@ export function formatMoney(cents: number) {
 
 export function formatWhen(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
     month: "short",
     day: "numeric",
     hour: "numeric",
