@@ -92,6 +92,32 @@ export function PublicFooter() {
           </Link>
         </span>
       </div>
+      <nav aria-label="Social profiles" className="flex justify-center gap-5 px-6 pb-4 text-xs text-[#5d7568]">
+        <a
+          href="https://www.facebook.com/share/19PSy2Vjrw/"
+          target="_blank"
+          rel="noreferrer"
+          className="hover:text-[#496252]"
+        >
+          Facebook
+        </a>
+        <a
+          href="https://www.tiktok.com/@tigeatsofficial"
+          target="_blank"
+          rel="noreferrer"
+          className="hover:text-[#496252]"
+        >
+          TikTok
+        </a>
+        <a
+          href="https://www.instagram.com/tigeats"
+          target="_blank"
+          rel="noreferrer"
+          className="hover:text-[#496252]"
+        >
+          Instagram
+        </a>
+      </nav>
       <p className="pb-6 text-center text-xs text-[#5d7568]">
         <a href="https://www.avenixplatform.tech/" target="_blank" rel="noreferrer" className="hover:text-[#496252]">
           Created by Avenix
