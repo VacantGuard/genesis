@@ -8,7 +8,7 @@ import { formatMoney, formatWhen } from "@/lib/format";
 import type { CheckoutDetails } from "@/lib/customer-auth";
 import type { PublicReview } from "@/lib/reviews";
 import type { BusinessProfile, PublicCategory, PublicMenuItem } from "@/lib/types";
-import { CoralUnderline, PublicFooter, PublicHeader, publicButton, publicField } from "@/components/public-chrome";
+import { CoralUnderline, PublicFooter, PublicHeader, SocialProfiles, publicButton, publicField } from "@/components/public-chrome";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -705,6 +705,7 @@ export function PublicSite({
           <div className="mx-auto max-w-3xl px-6 py-16 text-center">
             <h2 className="font-serif text-4xl tracking-tight text-[#496252]">Reviews</h2>
             <CoralUnderline />
+            <SocialProfiles />
             {reviews.length === 0 ? (
               <p className="mt-6 text-sm text-[#5d7568]">No reviews yet. Tell the kitchen how a meal went.</p>
             ) : (
