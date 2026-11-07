@@ -43,7 +43,18 @@ export function PublicHeader({
     <header className="sticky top-0 z-30 border-b border-[#a8c09c]/60 bg-[#fdeae3]/95 text-[#496252] backdrop-blur">
       <div className="mx-auto flex h-[4.75rem] max-w-5xl items-center justify-between gap-4 px-5">
         <Link href="/" aria-label="Home" className="relative inline-flex size-16 shrink-0 items-center justify-center">
-          <span className="logo-orbit" aria-hidden="true" />
+          <svg className="logo-orbit" viewBox="0 0 64 64" aria-hidden="true">
+            <circle
+              cx="32"
+              cy="32"
+              r="30"
+              fill="none"
+              stroke="#fc968a"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeDasharray="42 147"
+            />
+          </svg>
           <span className="inline-flex size-14 overflow-hidden rounded-full">
             <img
               src="/tigeats-logo.jpg"
