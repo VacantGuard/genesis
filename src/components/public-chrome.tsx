@@ -43,25 +43,12 @@ export function PublicHeader({
     <header className="sticky top-0 z-30 border-b border-[#a8c09c]/60 bg-[#fdeae3]/95 text-[#496252] backdrop-blur">
       <div className="mx-auto flex h-[4.75rem] max-w-5xl items-center justify-between gap-4 px-5">
         <Link href="/" aria-label="Home" className="inline-flex shrink-0">
-          <span className="relative inline-flex size-14 overflow-hidden rounded-full">
+          <span className="inline-flex size-14 overflow-hidden rounded-full">
             <img
               src="/tigeats-logo.jpg"
               alt=""
               className="size-full origin-center scale-[1.14] object-cover"
             />
-            <svg className="logo-ring" viewBox="0 0 56 56" aria-hidden="true">
-              <circle cx="28" cy="28" r="25.5" fill="none" stroke="#a7c0a0" strokeWidth="5" />
-              <circle
-                cx="28"
-                cy="28"
-                r="25.5"
-                fill="none"
-                stroke="#6d8a64"
-                strokeWidth="5"
-                strokeLinecap="round"
-                strokeDasharray="34 126"
-              />
-            </svg>
           </span>
         </Link>
         <nav className="flex items-center gap-4 text-sm font-medium sm:gap-6">
