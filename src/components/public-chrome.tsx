@@ -42,7 +42,8 @@ export function PublicHeader({
   return (
     <header className="sticky top-0 z-30 border-b border-[#a8c09c]/60 bg-[#fdeae3]/95 text-[#496252] backdrop-blur">
       <div className="mx-auto flex h-[4.75rem] max-w-5xl items-center justify-between gap-4 px-5">
-        <Link href="/" aria-label="Home" className="inline-flex shrink-0">
+        <Link href="/" aria-label="Home" className="relative inline-flex size-16 shrink-0 items-center justify-center">
+          <span className="logo-orbit" aria-hidden="true" />
           <span className="inline-flex size-14 overflow-hidden rounded-full">
             <img
               src="/tigeats-logo.jpg"

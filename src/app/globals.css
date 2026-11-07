@@ -146,8 +146,29 @@
   animation: coral-date-sway 8s ease-in-out infinite;
 }
 
+@keyframes logo-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.logo-orbit {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, transparent 0 250deg, #fc968a 310deg, #f9a89e 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 1.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 1.5px));
+  animation: logo-orbit 5s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .coral-date-sway {
     animation: none;
+  }
+
+  .logo-orbit {
+    animation: none;
+    background: #fc968a;
   }
 }
