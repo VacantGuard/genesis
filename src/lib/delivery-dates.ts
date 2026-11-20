@@ -33,6 +33,12 @@ export function deliveryChoices(now = new Date()): DeliveryChoice[] {
   return choices.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+export function isDeliveryWeekday(isoDate: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return false;
+  const day = weekdayIndex(isoDate);
+  return day === WEEKDAY.Monday || day === WEEKDAY.Thursday;
+}
+
 export function formatDeliveryDate(isoDate: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return "";
   const [year, month, day] = isoDate.split("-").map(Number);

@@ -45,8 +45,13 @@ function checked(formData: FormData, key: string) {
   return formData.getAll(key).includes("1");
 }
 
+function redirectWithNote(path: string, key: string, message: string): never {
+  const join = path.includes("?") ? "&" : "?";
+  redirect(`${path}${join}${key}=${encodeURIComponent(message)}`);
+}
+
 function bounce(path: string, message: string): never {
-  redirect(`${path}?error=${encodeURIComponent(message)}`);
+  redirectWithNote(path, "error", message);
 }
 
 async function deskBusiness() {
@@ -73,8 +78,8 @@ async function saved(path: string, message: string): Promise<never> {
   const business = await currentBusiness();
   revalidatePath("/");
   revalidatePath(`/b/${business.slug}`);
-  revalidatePath(path);
-  redirect(`${path}?saved=${encodeURIComponent(message)}`);
+  revalidatePath(path.split("?")[0] || path);
+  redirectWithNote(path, "saved", message);
 }
 
 function optionalId(raw: string) {
@@ -236,13 +241,19 @@ export async function saveRouteStartAction(formData: FormData) {
   );
 }
 
+function ordersListPath(formData: FormData) {
+  const day = field(formData, "day");
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? `/terminal/orders?day=${day}` : "/terminal/orders";
+}
+
 export async function markZelleReceivedAction(formData: FormData) {
   const business = await deskBusiness();
   const id = optionalId(field(formData, "id"));
+  const path = ordersListPath(formData);
   if (!id || !markZelleReceived(business.id, id)) {
-    bounce("/terminal/orders", "That Zelle order could not be marked received.");
+    bounce(path, "That Zelle order could not be marked received.");
   }
-  await saved("/terminal/orders", "Zelle transfer marked received.");
+  await saved(path, "Zelle transfer marked received.");
 }
 
 export async function setAvailabilityAction(formData: FormData) {

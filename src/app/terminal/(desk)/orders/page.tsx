@@ -2,14 +2,32 @@ import { addDriverAction, markZelleReceivedAction, removeDriverAction, saveRoute
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { currentBusiness } from "@/lib/current-business";
-import { formatDeliveryDate } from "@/lib/delivery-dates";
+import { deliveryChoices, formatDeliveryDate, isDeliveryWeekday } from "@/lib/delivery-dates";
 import { listDrivers, routeStartAddress } from "@/lib/driver-route";
 import { formatMoney, formatWhen } from "@/lib/format";
 import { listOrders } from "@/lib/orders";
 
-export default async function OrdersPage() {
+function deliveryDayChoices(orders: { deliveryDate: string }[], selectedDay: string, now: Date) {
+  const dates = new Set<string>();
+  if (selectedDay) dates.add(selectedDay);
+  for (const order of orders) {
+    if (isDeliveryWeekday(order.deliveryDate)) dates.add(order.deliveryDate);
+  }
+  for (const choice of deliveryChoices(now)) dates.add(choice.date);
+  return [...dates].sort((a, b) => b.localeCompare(a));
+}
+
+export default async function OrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ day?: string }>;
+}) {
+  const query = await searchParams;
   const business = await currentBusiness();
   const orders = listOrders(business.id);
+  const selectedDay = query.day && isDeliveryWeekday(query.day) ? query.day : "";
+  const dayOptions = deliveryDayChoices(orders, selectedDay, new Date());
+  const visible = selectedDay ? orders.filter((order) => order.deliveryDate === selectedDay) : orders;
   const drivers = listDrivers(business.id);
   const start = routeStartAddress(business.id);
 
@@ -77,13 +95,39 @@ export default async function OrdersPage() {
         </form>
       </section>
 
-      {orders.length === 0 ? (
+      <form method="get" className="flex flex-wrap items-end gap-3">
+        <label className="grid gap-1.5 text-sm">
+          <span className="font-medium">Delivery day</span>
+          <select
+            name="day"
+            defaultValue={selectedDay}
+            className="h-10 rounded-lg border bg-background px-3 text-sm"
+          >
+            <option value="">All days</option>
+            {dayOptions.map((date) => (
+              <option key={date} value={date}>
+                {formatDeliveryDate(date)}, {date.slice(0, 4)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button type="submit" variant="outline">
+          Show
+        </Button>
         <p className="text-sm text-muted-foreground">
-          No orders yet. Place one from the public menu.
+          All days shows every order. A date shows orders stored for that Monday or Thursday.
+        </p>
+      </form>
+
+      {visible.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {selectedDay
+            ? `No orders for ${formatDeliveryDate(selectedDay)}.`
+            : "No orders yet. Place one from the public menu."}
         </p>
       ) : (
         <div className="grid gap-4">
-          {orders.map((order) => (
+          {visible.map((order) => (
             <article key={order.id} className="grid gap-3 rounded-xl border bg-card p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="font-heading text-2xl tracking-tight">{order.orderNumber}</h2>
@@ -124,6 +168,7 @@ export default async function OrdersPage() {
               {order.cardLast4 === "Zelle" && order.status === "zelle" ? (
                 <form action={markZelleReceivedAction}>
                   <input type="hidden" name="id" value={order.id} />
+                  {selectedDay ? <input type="hidden" name="day" value={selectedDay} /> : null}
                   <Button type="submit" size="sm" variant="outline">
                     Mark Zelle received
                   </Button>
