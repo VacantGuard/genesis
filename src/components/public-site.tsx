@@ -1030,6 +1030,9 @@ export function PublicSite({
                       Monday delivery closes Sunday at noon. Thursday delivery closes Wednesday at noon. An order
                       placed Saturday can still choose the coming Thursday.
                     </p>
+                    {deliveryChoices.length === 0 ? (
+                      <p className="text-sm text-[#5d7568]">No delivery day is open right now.</p>
+                    ) : null}
                     {deliveryChoices.map((choice) => (
                       <label key={choice.date} className="flex items-start gap-2 text-sm">
                         <input

@@ -2,18 +2,33 @@ import { addDriverAction, markZelleReceivedAction, removeDriverAction, saveRoute
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { currentBusiness } from "@/lib/current-business";
-import { deliveryChoices, formatDeliveryDate, isDeliveryWeekday } from "@/lib/delivery-dates";
+import {
+  deliveryChoices,
+  formatDeliveryDate,
+  isDeliveryWeekday,
+  skippedDeliveryDates,
+  staffDeliveryDates,
+} from "@/lib/delivery-dates";
 import { listDrivers, routeStartAddress } from "@/lib/driver-route";
 import { formatMoney, formatWhen } from "@/lib/format";
 import { listOrders } from "@/lib/orders";
 
-function deliveryDayChoices(orders: { deliveryDate: string }[], selectedDay: string, now: Date) {
+function deliveryDayChoices(
+  orders: { deliveryDate: string }[],
+  selectedDay: string,
+  skipped: ReadonlySet<string>,
+  now: Date,
+) {
   const dates = new Set<string>();
   if (selectedDay) dates.add(selectedDay);
   for (const order of orders) {
     if (isDeliveryWeekday(order.deliveryDate)) dates.add(order.deliveryDate);
   }
   for (const choice of deliveryChoices(now)) dates.add(choice.date);
+  const manageable = new Set(staffDeliveryDates(now).map((choice) => choice.date));
+  for (const date of skipped) {
+    if (manageable.has(date)) dates.add(date);
+  }
   return [...dates].sort((a, b) => b.localeCompare(a));
 }
 
@@ -26,7 +41,7 @@ export default async function OrdersPage({
   const business = await currentBusiness();
   const orders = listOrders(business.id);
   const selectedDay = query.day && isDeliveryWeekday(query.day) ? query.day : "";
-  const dayOptions = deliveryDayChoices(orders, selectedDay, new Date());
+  const dayOptions = deliveryDayChoices(orders, selectedDay, skippedDeliveryDates(business.id), new Date());
   const visible = selectedDay ? orders.filter((order) => order.deliveryDate === selectedDay) : orders;
   const drivers = listDrivers(business.id);
   const start = routeStartAddress(business.id);

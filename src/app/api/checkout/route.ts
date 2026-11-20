@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getBusinessBySlug, getHomepageBusiness } from "@/lib/businesses";
 import { OrderError } from "@/lib/db";
 import { readDeliveryAddress, validateDeliveryAddress } from "@/lib/delivery";
-import { deliveryDateError } from "@/lib/delivery-dates";
+import { deliveryDateError, skippedDeliveryDates } from "@/lib/delivery-dates";
 import { cleanLineNote, priceOrderLines } from "@/lib/orders";
 import { GO_LIVE_MESSAGE, visitorSeesMenu } from "@/lib/go-live";
 import { ensureApplePayDomains, openCheckout } from "@/lib/stripe";
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     }
     const deliveryError = validateDeliveryAddress(delivery);
     if (deliveryError) return NextResponse.json({ error: deliveryError }, { status: 400 });
-    const dateError = deliveryDateError(clean(body.deliveryDate, 10));
+    const dateError = deliveryDateError(clean(body.deliveryDate, 10), new Date(), skippedDeliveryDates(business.id));
     if (dateError) return NextResponse.json({ error: dateError }, { status: 400 });
   }
 

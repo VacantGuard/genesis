@@ -4,7 +4,7 @@ import {
   formatDeliveryAddress,
   type DeliveryAddress,
 } from "./delivery.ts";
-import { deliveryDateError } from "./delivery-dates.ts";
+import { deliveryDateError, skippedDeliveryDates } from "./delivery-dates.ts";
 import { upsertCustomerDeliveryFromOrder } from "./directory.ts";
 import { getDb, OrderError, type NewOrderInput } from "./db.ts";
 import type { DashboardStats, KitchenOrder } from "./types.ts";
@@ -180,7 +180,7 @@ export function placeOrder(businessId: number, input: NewOrderInput) {
     }
     const { priced, totalCents } = priceOrderLines(businessId, input.lines);
     ensureOrderDeliveryColumns(db);
-    const dateError = deliveryDateError(input.deliveryDate ?? "");
+    const dateError = deliveryDateError(input.deliveryDate ?? "", new Date(), skippedDeliveryDates(businessId));
     if (dateError) throw new OrderError(dateError);
     const deliveryDate = input.deliveryDate ?? "";
     const delivery = input.delivery ?? {

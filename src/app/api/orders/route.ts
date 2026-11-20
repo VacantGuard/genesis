@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getBusinessBySlug, getHomepageBusiness } from "@/lib/businesses";
 import { OrderError } from "@/lib/db";
 import { readDeliveryAddress, validateDeliveryAddress } from "@/lib/delivery";
-import { deliveryDateError, formatDeliveryDate } from "@/lib/delivery-dates";
+import { deliveryDateError, formatDeliveryDate, skippedDeliveryDates } from "@/lib/delivery-dates";
 import { recordPaidOrder, recordZelleOrder } from "@/lib/order-alert";
 import { cleanLineNote, priceOrderLines } from "@/lib/orders";
 import { chargeCard, paidIntent, stripeSettings } from "@/lib/stripe";
@@ -69,8 +69,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: deliveryError }, { status: 400 });
   }
   const deliveryDate = clean(body.deliveryDate, 10);
-  const dateError = deliveryDateError(deliveryDate);
-  if (dateError) return NextResponse.json({ error: dateError }, { status: 400 });
 
   const lines = Array.isArray(body.lines) ? body.lines : [];
   const merged = new Map<number, number>();
@@ -97,6 +95,8 @@ export async function POST(request: Request) {
   if (!business) {
     return NextResponse.json({ error: "That menu is not available." }, { status: 400 });
   }
+  const dateError = deliveryDateError(deliveryDate, new Date(), skippedDeliveryDates(business.id));
+  if (dateError) return NextResponse.json({ error: dateError }, { status: 400 });
 
   let cardLast4 = "";
   let wallet = "";

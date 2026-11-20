@@ -14,6 +14,7 @@ import { deskIsOpen, GO_LIVE_MESSAGE } from "@/lib/go-live";
 import { publishMenuUpdate } from "@/lib/agent";
 import { menuLink, setMenuWeekNote, updateBusinessProfile, type BusinessRecord } from "@/lib/businesses";
 import { currentBusiness } from "@/lib/current-business";
+import { formatDeliveryDate, setDeliveryDateSkipped, staffDeliveryDates } from "@/lib/delivery-dates";
 import {
   deleteCompany,
   deleteCustomer,
@@ -160,6 +161,21 @@ export async function saveMenuWeekAction(formData: FormData) {
   await saved(
     "/terminal/menu",
     weekOf ? "Week line saved on the public menu." : "Week line cleared on the public menu.",
+  );
+}
+
+export async function skipDeliveryDateAction(formData: FormData) {
+  const business = await deskBusiness();
+  const date = field(formData, "date");
+  const restore = field(formData, "restore") === "1";
+  if (!staffDeliveryDates().some((choice) => choice.date === date)) {
+    bounce("/terminal/menu", "That delivery day can no longer be changed.");
+  }
+  setDeliveryDateSkipped(business.id, date, !restore);
+  const label = formatDeliveryDate(date);
+  await saved(
+    "/terminal/menu",
+    restore ? `${label} is back on checkout.` : `${label} is skipped. Customers cannot choose it.`,
   );
 }
 

@@ -5,7 +5,7 @@ import { getHomepageBusiness, getMenuWeekNote } from "@/lib/businesses";
 import { visitorSeesMenu } from "@/lib/go-live";
 import { getPublicMenu } from "@/lib/menu";
 import { listReviews } from "@/lib/reviews";
-import { deliveryChoices } from "@/lib/delivery-dates";
+import { deliveryChoices, skippedDeliveryDates } from "@/lib/delivery-dates";
 import { stripePublishableKey } from "@/lib/stripe";
 import { zelleAccount } from "@/lib/zelle";
 
@@ -38,7 +38,7 @@ export default async function HomePage() {
       checkout={checkoutDetails(account, business.id)}
       stripePublishableKey={stripePublishableKey(business.id)}
       canPayWithZelle={Boolean(zelleAccount(business.id))}
-      deliveryChoices={deliveryChoices()}
+      deliveryChoices={deliveryChoices(new Date(), skippedDeliveryDates(business.id))}
     />
   );
 }

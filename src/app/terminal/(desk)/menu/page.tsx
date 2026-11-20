@@ -10,9 +10,11 @@ import {
   deleteMenuItemAction,
   saveMenuWeekAction,
   setAvailabilityAction,
+  skipDeliveryDateAction,
   updateMenuItemAction,
 } from "@/lib/actions";
 import { getMenuWeekNote } from "@/lib/businesses";
+import { skippedDeliveryDates, staffDeliveryDates } from "@/lib/delivery-dates";
 import { currentBusiness } from "@/lib/current-business";
 import { formatMoney } from "@/lib/format";
 import { mealPhotoUrl } from "@/lib/meal-photo";
@@ -27,6 +29,8 @@ export default async function MenuPage({
   const business = await currentBusiness();
   const items = listMenuItems(business.id);
   const weekNote = getMenuWeekNote(business.id);
+  const skipped = skippedDeliveryDates(business.id);
+  const deliveryDates = staffDeliveryDates();
 
   return (
     <>
@@ -57,6 +61,36 @@ export default async function MenuPage({
           <Button type="submit">Save week</Button>
         </div>
       </form>
+
+      <section className="grid gap-3 rounded-xl border bg-card p-4">
+        <div>
+          <h2 className="font-medium">Delivery days</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Skip one Monday or Thursday. That date leaves checkout. Put it back when the kitchen can deliver.
+            Orders already placed for that day stay on the desk.
+          </p>
+        </div>
+        <ul className="grid gap-2">
+          {deliveryDates.map((choice) => {
+            const isSkipped = skipped.has(choice.date);
+            return (
+              <li key={choice.date} className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                <span>
+                  {choice.label}
+                  {isSkipped ? <span className="text-muted-foreground"> · skipped</span> : null}
+                </span>
+                <form action={skipDeliveryDateAction}>
+                  <input type="hidden" name="date" value={choice.date} />
+                  {isSkipped ? <input type="hidden" name="restore" value="1" /> : null}
+                  <Button type="submit" size="sm" variant="outline">
+                    {isSkipped ? "Put this day back" : "Skip this day"}
+                  </Button>
+                </form>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
 
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground">No meals on the menu yet.</p>
